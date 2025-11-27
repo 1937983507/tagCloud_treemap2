@@ -24,6 +24,7 @@ import {
   Collection,
   EditPen,
   Grid,
+  Connection,
 } from '@element-plus/icons-vue';
 
 defineProps({
@@ -39,7 +40,8 @@ const mainMenu = [
   { key: 'content', label: '内容', icon: Collection },
   { key: 'typeface', label: '字体', icon: EditPen },
   { key: 'color', label: '配色', icon: BrushFilled },
-  { key: 'layout', label: '布局', icon: Grid }, // 补充Grid图标
+  { key: 'layout', label: '布局', icon: Grid },
+  { key: 'line', label: '线条', icon: Connection }, // 新增线条按钮 选用Connection图标
 ];
 
 const handleHelpClick = () => {

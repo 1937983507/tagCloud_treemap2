@@ -34,6 +34,11 @@ export const usePoiStore = defineStore('poiStore', {
     colorNum: 4, // 默认颜色数量
     Colors: ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'], // 简化后保持和palette一致，随palette变
     cloudLoading: false, // 标签云遮罩 loading 状态
+    linePanel: {
+      type: 'curve', // 默认曲线
+      width: 3,
+      color: '#aaa'
+    },
   }),
   getters: {
     totalCount: (state) => state.poiList.length,
@@ -188,6 +193,12 @@ export const usePoiStore = defineStore('poiStore', {
     },
     setLayoutType(type) {
       this.lineType = type;
+    },
+    setLinePanel(panel) {
+      this.linePanel = {
+        ...this.linePanel,
+        ...panel,
+      };
     },
   },
 });

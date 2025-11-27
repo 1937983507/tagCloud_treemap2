@@ -17,6 +17,7 @@
           <TypefacePanel v-show="activePanel === 'typeface'" />
           <ColorPanel v-show="activePanel === 'color'" />
           <LayoutPanel v-show="activePanel === 'layout'" />
+          <LinePanel v-show="activePanel === 'line'" />
         </div>
         <SplitterBar />
         <TagCloudCanvas ref="tagCloudCanvasRef" />
@@ -37,6 +38,7 @@ import ColorPanel from '@/components/color/ColorPanel.vue';
 import TagCloudCanvas from '@/components/tagcloud/TagCloudCanvas.vue';
 import SplitterBar from '@/components/common/SplitterBar.vue';
 import LayoutPanel from '@/components/layout/LayoutPanel.vue';
+import LinePanel from '@/components/line/LinePanel.vue';
 
 const activePanel = ref('content');
 const headerRef = ref(null);
