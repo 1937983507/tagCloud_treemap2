@@ -19,8 +19,8 @@ export const usePoiStore = defineStore('poiStore', {
     cityOrder: [], // 城市顺序
     compiledData: {}, // 编译后的数据（按城市分组）
     fontSettings: {
-      levelCount: 5,
-      fontSizes: [64, 52, 44, 36, 28, 24, 20],
+      minFontSize: 10,
+      maxFontSize: 40,
       fontFamily: '等线',
       fontWeight: '700',
     },

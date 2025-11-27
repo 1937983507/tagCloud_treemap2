@@ -20,6 +20,10 @@
           </div>
         </div>
       </div>
+      <div v-if="cloudLoading" class="cloud-loading-overlay">
+        <span class="cloud-loading-icon">⏳</span>
+        <span class="cloud-loading-text">标签云生成中...</span>
+      </div>
     </div>
   </aside>
 </template>
@@ -36,6 +40,30 @@ const wrapperRef = ref(null);
 const svgRef = ref(null);
 let svg = null;
 let graph = null;
+
+// loading 遮罩状态
+const cloudLoading = ref(false);
+
+// 优化动态分配字号——对数插值算法
+function updateFontSizesForCompiledData(compiledData, fontSettings) {
+  const allPoiArr = [];
+  Object.values(compiledData).forEach(arr => allPoiArr.push(...arr));
+  const rankList = allPoiArr.map(p => parseInt(p.rankInChina)).filter(r => r > 0 && isFinite(r));
+  if (!rankList.length) { allPoiArr.forEach(p=>p.size=fontSettings.minFontSize); return; }
+  const minRank = Math.min(...rankList);
+  const maxRank = Math.max(...rankList);
+  if (!isFinite(minRank) || !isFinite(maxRank) || minRank<=0 || maxRank<=0) { allPoiArr.forEach(p=>p.size=fontSettings.minFontSize); return; }
+  const logMin = Math.log(minRank);
+  const logMax = Math.log(maxRank);
+  allPoiArr.forEach(poi => {
+    const r = parseInt(poi.rankInChina);
+    if (!r || r<=0 || !isFinite(r)) { poi.size=fontSettings.minFontSize; return; }
+    const logR = Math.log(r);
+    if (logMax-logMin === 0) { poi.size=fontSettings.minFontSize; return; }
+    let size = fontSettings.minFontSize + (fontSettings.maxFontSize - fontSettings.minFontSize) * (logMax-logR) / (logMax-logMin);
+    poi.size = (isFinite(size) && size>0) ? size : fontSettings.minFontSize;
+  });
+}
 
 // 计算每个城市景点权重
 const calculateAttractionWeights = (data, cityOrder) => {
@@ -191,14 +219,14 @@ const drawSVGLine = (svg, root, cityOrder) => {
       y: (d.y0 + d.y1) / 2
     };
   });
-
-  const orderedPoints = cityOrder.map(city => recpoints.find(point => point.city === city));
-
+  const orderedPoints = cityOrder
+    .map(city => recpoints.find(point => point.city === city))
+    .filter(point => point && isFinite(point.x) && isFinite(point.y));
+  if (orderedPoints.length < 2) return;
   const line = d3.line()
     .x(d => d.x)
     .y(d => d.y)
     .curve(d3.curveCatmullRom.alpha(0.5));
-
   svg.append("path")
     .datum(orderedPoints)
     .attr("fill", "none")
@@ -209,14 +237,10 @@ const drawSVGLine = (svg, root, cityOrder) => {
 
 // 绘制单个词云
 const drawWordCloud = (i, svg, cities, city, x, y, colorIndex, color, width, height, resolve) => {
+  if (!isFinite(x) || !isFinite(y)) { if(resolve)resolve(); return; }
   const words = cities[city] ? cities[city].map(d => ({ text: d.text, size: d.size, color: color })) : [];
-  if (words.length == 0) {
-    if (resolve) resolve();
-    return;
-  }
-
+  if (words.length == 0) { if (resolve) resolve(); return; }
   words.push({ text: city, size: 46, isCity: true, colorIndex: -1 });
-
   const layout = cloud()
     .size([width, height])
     .words(words)
@@ -231,7 +255,6 @@ const drawWordCloud = (i, svg, cities, city, x, y, colorIndex, color, width, hei
         .attr("transform", `translate(${x},${y})`)
         .attr("data-colorindex", colorIndex)
         .attr("id", `cloud-${i}`);
-
       g.selectAll("text")
         .data(words)
         .enter().append("text")
@@ -243,10 +266,8 @@ const drawWordCloud = (i, svg, cities, city, x, y, colorIndex, color, width, hei
         .attr("text-anchor", "middle")
         .attr("transform", d => `translate(${d.x},${d.y})rotate(${d.rotate})`)
         .text(d => d.text);
-      
       if (resolve) resolve();
     });
-
   layout.start();
 };
 
@@ -314,42 +335,43 @@ const drawAllWordClouds = (svg, data, cityOrder, width, height, lineType) => {
 };
 
 const handleRenderCloud = async () => {
-  console.info('[TagCloudCanvas] handleRenderCloud 开始', {
-    hasDrawing: poiStore.hasDrawing,
-    cityOrderCount: poiStore.cityOrder.length,
-    compiledKeys: Object.keys(poiStore.compiledData || {}).length,
-  });
-  if (!poiStore.hasDrawing) {
-    console.warn('请先在地图上绘制折线');
-    return;
-  }
-
-  // 检查数据是否已准备好
-  if (!poiStore.cityOrder.length || !Object.keys(poiStore.compiledData).length) {
-    console.warn('数据未准备好，请等待数据处理完成', {
-      cityOrder: poiStore.cityOrder,
-      compiledDataKeys: Object.keys(poiStore.compiledData || {}),
+  cloudLoading.value = true;
+  try {
+    console.info('[TagCloudCanvas] handleRenderCloud 开始', {
+      hasDrawing: poiStore.hasDrawing,
+      cityOrderCount: poiStore.cityOrder.length,
+      compiledKeys: Object.keys(poiStore.compiledData || {}).length,
     });
-    return;
+    if (!poiStore.hasDrawing) {
+      console.warn('请先在地图上绘制折线');
+      return;
+    }
+    // 检查数据是否已准备好
+    if (!poiStore.cityOrder.length || !Object.keys(poiStore.compiledData).length) {
+      console.warn('数据未准备好，请等待数据处理完成', {
+        cityOrder: poiStore.cityOrder,
+        compiledDataKeys: Object.keys(poiStore.compiledData || {}),
+      });
+      return;
+    }
+    await nextTick();
+    if (!svgRef.value || !wrapperRef.value) return;
+    const rect = wrapperRef.value.getBoundingClientRect();
+    const width = Math.floor(rect.width);
+    const height = Math.floor(rect.height);
+    svg = d3.select(svgRef.value);
+    svg.selectAll("*").remove();
+    svg.attr("width", width).attr("height", height);
+    const data = poiStore.compiledData;
+    const cityOrder = poiStore.cityOrder;
+    const lineType = poiStore.lineType || 'Pivot';
+    // 字号分配
+    updateFontSizesForCompiledData(data, poiStore.fontSettings);
+    await nextTick();
+    drawAllWordClouds(svg, data, cityOrder, width, height, lineType);
+  } finally {
+    cloudLoading.value = false;
   }
-
-  await nextTick();
-  
-  if (!svgRef.value || !wrapperRef.value) return;
-  
-  const rect = wrapperRef.value.getBoundingClientRect();
-  const width = Math.floor(rect.width);
-  const height = Math.floor(rect.height);
-
-  svg = d3.select(svgRef.value);
-  svg.selectAll("*").remove();
-  svg.attr("width", width).attr("height", height);
-
-  const data = poiStore.compiledData;
-  const cityOrder = poiStore.cityOrder;
-  const lineType = poiStore.lineType || 'Pivot';
-
-  drawAllWordClouds(svg, data, cityOrder, width, height, lineType);
 };
 
 // 导出图片
@@ -396,6 +418,17 @@ watch(
   (length) => {
     console.info('[TagCloudCanvas] compiledData 键数量', length);
   }
+);
+
+// watch字体设置深度变化，自动刷新并显示loading
+watch(
+  () => poiStore.fontSettings,
+  (newVal, oldVal) => {
+    if (poiStore.hasDrawing) {
+      handleRenderCloud();
+    }
+  },
+  { deep: true }
 );
 </script>
 
@@ -503,5 +536,30 @@ svg {
   color: rgba(255, 255, 255, 0.6);
   letter-spacing: 0.3px;
 }
+.cloud-loading-overlay {
+  position: absolute;
+  z-index: 99;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(25, 30, 40, 0.72);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 20px;
+  pointer-events: all;
+  gap: 18px;
+  font-weight: bold;
+  backdrop-filter: blur(2px);
+}
+.cloud-loading-icon {
+  font-size: 44px;
+  margin-bottom: 12px;
+  animation: cloud-spin 1s linear infinite;
+}
+@keyframes cloud-spin {
+  to {transform: rotate(1turn);}
+}
+.cloud-loading-text {margin-top: 8px;}
 </style>
 

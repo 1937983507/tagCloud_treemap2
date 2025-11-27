@@ -184,13 +184,10 @@ const compileData = (selectedPOI) => {
 
   selectedPOI.forEach(poi => {
     const { pname, city, rankInChina } = poi;
-    const size = rankToSize(parseInt(rankInChina));
-
     if (!data[city]) {
       data[city] = [];
     }
-
-    data[city].push({ text: pname, size });
+    data[city].push({ text: pname, rankInChina });
   });
 
   return data;

@@ -1,53 +1,19 @@
 <template>
   <section class="panel-card typeface-panel">
-    <!-- 标签层级设置 -->
+    <!-- 字号设置 -->
     <div class="config-section">
       <div class="section-header">
-        <span class="section-title">标签层级</span>
+        <span class="section-title">字号区间</span>
+        <span class="section-desc">设置标签字号的最大/最小值</span>
       </div>
       <div class="section-content">
-        <div class="level-selector">
-          <span class="label">标签级数：</span>
-          <el-select
-            v-model="localSettings.levelCount"
-            style="width: 140px"
-            @change="handleLevelChange"
-          >
-            <el-option
-              v-for="count in 5"
-              :key="count + 2"
-              :label="`${count + 2} 级标签`"
-              :value="count + 2"
-            />
-          </el-select>
-        </div>
-      </div>
-    </div>
-
-    <!-- 字号大小 -->
-    <div class="config-section">
-      <div class="section-header">
-        <span class="section-title">字号大小</span>
-        <span class="section-desc">设置各级标签的字体大小</span>
-      </div>
-      <div class="section-content">
-        <div class="font-size-grid">
-          <div
-            v-for="(label, index) in levelLabels"
-            :key="label"
-            class="font-size-item"
-          >
-            <span class="font-size-label">{{ label }}</span>
-            <el-input-number
-              v-model="localSizes[index]"
-              :min="16"
-              :max="120"
-              :step="2"
-              @change="handleSizeChange"
-              style="width: 120px"
-            />
-            <span class="font-size-unit">px</span>
-          </div>
+        <div class="fontsize-row">
+          <span class="fontsize-label">最小字号：</span>
+          <el-input-number v-model="localSettings.minFontSize" :min="8" :max="120" :step="2" @change="() => poiStore.updateFontLevel({ minFontSize: localSettings.minFontSize })" />
+          <span class="fontsize-unit">px</span>
+          <span class="fontsize-label" style="margin-left:40px">最大字号：</span>
+          <el-input-number v-model="localSettings.maxFontSize" :min="8" :max="120" :step="2" @change="() => poiStore.updateFontLevel({ maxFontSize: localSettings.maxFontSize })" />
+          <span class="fontsize-unit">px</span>
         </div>
       </div>
     </div>
@@ -116,24 +82,17 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue';
+import { reactive, ref } from 'vue';
 import { usePoiStore } from '@/stores/poiStore';
 
 const poiStore = usePoiStore();
 const activeFontTab = ref('cn');
 
-const levelLabels = computed(() =>
-  Array.from({ length: poiStore.fontSettings.levelCount }, (_, index) => `第 ${index + 1} 级`),
-);
-
 const localSettings = reactive({
-  levelCount: poiStore.fontSettings.levelCount,
+  minFontSize: poiStore.fontSettings.minFontSize,
+  maxFontSize: poiStore.fontSettings.maxFontSize,
   fontWeight: poiStore.fontSettings.fontWeight,
 });
-
-const localSizes = ref(
-  poiStore.fontSettings.fontSizes.slice(0, poiStore.fontSettings.levelCount),
-);
 
 const fontGroups = [
   {
@@ -168,43 +127,12 @@ const fontGroups = [
   },
 ];
 
-let levelChangeTimer = null;
-const handleLevelChange = () => {
-  if (levelChangeTimer) clearTimeout(levelChangeTimer);
-  levelChangeTimer = setTimeout(() => {
-    localSizes.value = poiStore.fontSettings.fontSizes.slice(0, localSettings.levelCount);
-    poiStore.updateFontLevel({
-      levelCount: localSettings.levelCount,
-      fontSizes: [...poiStore.fontSettings.fontSizes],
-    });
-  }, 100);
-};
-
-let sizeChangeTimer = null;
-const handleSizeChange = () => {
-  if (sizeChangeTimer) clearTimeout(sizeChangeTimer);
-  sizeChangeTimer = setTimeout(() => {
-    const merged = [...poiStore.fontSettings.fontSizes];
-    for (let i = 0; i < localSizes.value.length; i += 1) {
-      merged[i] = localSizes.value[i];
-    }
-    poiStore.updateFontLevel({
-      fontSizes: merged,
-    });
-  }, 100);
-};
-
-const handleWeightChange = () => {
-  poiStore.updateFontLevel({
-    fontWeight: localSettings.fontWeight,
-  });
-};
-
-const handleFamilyChange = (font) => {
-  poiStore.updateFontLevel({
-    fontFamily: font,
-  });
-};
+function handleWeightChange() {
+  poiStore.updateFontLevel({ fontWeight: localSettings.fontWeight });
+}
+function handleFamilyChange(font) {
+  poiStore.updateFontLevel({ fontFamily: font });
+}
 </script>
 
 <style scoped>
@@ -341,5 +269,8 @@ const handleFamilyChange = (font) => {
   border-radius: 10px;
   font-weight: 500;
 }
+.fontsize-row {display:flex;align-items:center;gap:12px;margin:10px 0;}
+.fontsize-label {font-size:14px;color:#606266;min-width:68px;}
+.fontsize-unit {font-size:12px;color:#909399;}
 </style>
 
