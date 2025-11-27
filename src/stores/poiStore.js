@@ -1,0 +1,176 @@
+import { defineStore } from 'pinia';
+import axios from 'axios';
+
+const DATA_URL = '/data/chinapoi.csv';
+
+export const usePoiStore = defineStore('poiStore', {
+  state: () => ({
+    poiList: [],
+    allPOI: [], // 存储所有POI数据（原始格式）
+    dataLoaded: false,
+    dataLoadingPromise: null,
+    visibleMode: 'all',
+    selectedIds: [],
+    hasDrawing: false, // 是否有绘制折线
+    userDrawObj: null, // 用户绘制的折线对象
+    route: null, // 导航路线
+    startMarker: null, // 起点标记
+    endMarker: null, // 终点标记
+    cityOrder: [], // 城市顺序
+    compiledData: {}, // 编译后的数据（按城市分组）
+    fontSettings: {
+      levelCount: 5,
+      fontSizes: [64, 52, 44, 36, 28, 24, 20],
+      fontFamily: '等线',
+      fontWeight: '700',
+    },
+    colorSettings: {
+      background: '#0c1024',
+      palette: ['rgb(240,249,232)', 'rgb(186,228,188)', 'rgb(123,204,196)', 'rgb(67,162,202)', 'rgb(8,104,172)'],
+      inverted: false,
+      discreteMethod: 'quantile',
+      discreteCount: 5,
+    },
+    lineType: 'Pivot', // 默认线型
+    colorNum: 4, // 默认颜色数量
+    Colors: ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2"], // 默认颜色数组
+  }),
+  getters: {
+    totalCount: (state) => state.poiList.length,
+    selectedCount: (state) => state.selectedIds.length,
+    visibleList: (state) => {
+      if (state.visibleMode === 'selected') {
+        return state.poiList.filter((poi) =>
+          state.selectedIds.includes(poi.id),
+        );
+      }
+      return state.poiList;
+    },
+  },
+  actions: {
+    async loadDefaultData() {
+      if (this.dataLoaded) {
+        return;
+      }
+      if (this.dataLoadingPromise) {
+        return this.dataLoadingPromise;
+      }
+
+      this.dataLoadingPromise = (async () => {
+        try {
+          const response = await axios.get(DATA_URL, {
+            responseType: 'arraybuffer',
+          });
+          const decoderCandidates = ['gb18030', 'gbk', 'utf-8'];
+          let text = null;
+          for (const encoding of decoderCandidates) {
+            try {
+              text = new TextDecoder(encoding, { fatal: false }).decode(response.data);
+              if (text && text.trim()) {
+                console.info('[poiStore] 使用解码格式', encoding);
+                break;
+              }
+            } catch (decodeError) {
+              console.warn('[poiStore] TextDecoder 无法使用', encoding, decodeError);
+            }
+          }
+          if (!text) {
+            throw new Error('无法解码 POI 数据');
+          }
+          const lines = text.split('\n');
+          this.allPOI = [];
+          this.poiList = [];
+
+          for (let i = 1; i < lines.length; i++) {
+            const currentLine = lines[i].split(',');
+            if (currentLine.length < 6) continue;
+
+            const pname = currentLine[0];
+            const X_gcj02 = parseFloat(currentLine[1]);
+            const Y_gcj02 = parseFloat(currentLine[2]);
+            const city = currentLine[3];
+            const rankInCity = parseInt(currentLine[4]);
+            const rankInChina = parseInt(currentLine[5]);
+
+            const onePOI = {
+              pid: i - 1,
+              pname: pname,
+              X_gcj02: X_gcj02,
+              Y_gcj02: Y_gcj02,
+              lnglat: [X_gcj02, Y_gcj02],
+              rankInCity: rankInCity,
+              rankInChina: rankInChina,
+              city: city,
+              selected: false,
+              checked: false,
+              deleted: false,
+            };
+
+            this.allPOI.push(onePOI);
+
+            // 同时添加到poiList（用于兼容）
+            this.poiList.push({
+              id: onePOI.pid,
+              name: onePOI.pname,
+              city: onePOI.city,
+              rank: onePOI.rankInChina,
+              lng: onePOI.X_gcj02,
+              lat: onePOI.Y_gcj02,
+              selected: false,
+            });
+          }
+
+          this.dataLoaded = true;
+        } catch (error) {
+          console.error('加载数据失败:', error);
+          throw error;
+        } finally {
+          this.dataLoadingPromise = null;
+        }
+      })();
+
+      return this.dataLoadingPromise;
+    },
+    setHasDrawing(hasDrawing) {
+      this.hasDrawing = hasDrawing;
+    },
+    setUserDrawObj(obj) {
+      this.userDrawObj = obj;
+    },
+    setRoute(route) {
+      this.route = route;
+    },
+    setStartMarker(marker) {
+      this.startMarker = marker;
+    },
+    setEndMarker(marker) {
+      this.endMarker = marker;
+    },
+    setCityOrderAndData(cityOrder, data) {
+      this.cityOrder = cityOrder;
+      this.compiledData = data;
+    },
+    clearDrawing() {
+      this.hasDrawing = false;
+      this.userDrawObj = null;
+      this.route = null;
+      this.startMarker = null;
+      this.endMarker = null;
+      this.cityOrder = [];
+      this.compiledData = {};
+    },
+    updateFontLevel(payload) {
+      this.fontSettings = {
+        ...this.fontSettings,
+        ...payload,
+      };
+    },
+    updateColorSettings(payload) {
+      this.colorSettings = {
+        ...this.colorSettings,
+        ...payload,
+      };
+    },
+  },
+});
+
