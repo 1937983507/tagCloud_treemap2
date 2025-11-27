@@ -4,7 +4,9 @@
       <el-button type="primary" @click="handleRenderCloud">运行生成标签云</el-button>
     </header>
     <div class="canvas-wrapper" ref="wrapperRef">
-      <svg ref="svgRef"></svg>
+      <svg ref="svgRef"
+           :style="{ background: poiStore.colorSettings.background }"
+      ></svg>
       <div v-if="!poiStore.hasDrawing || !poiStore.cityOrder.length" class="empty-cloud-hint">
         <div class="hint-content">
           <div class="hint-icon">
@@ -482,7 +484,7 @@ svg {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgb(255, 255, 255);
+  background: rgba(255, 255, 255, 0);
   backdrop-filter: blur(8px);
   z-index: 5;
   pointer-events: none;

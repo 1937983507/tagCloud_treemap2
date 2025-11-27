@@ -25,7 +25,7 @@ export const usePoiStore = defineStore('poiStore', {
       fontWeight: '700',
     },
     colorSettings: {
-      background: '#0c1024',
+      background: 'rgb(255, 255, 255)',
       palette: ['rgb(240,249,232)', 'rgb(186,228,188)', 'rgb(123,204,196)', 'rgb(67,162,202)', 'rgb(8,104,172)'],
       inverted: false,
       discreteMethod: 'quantile',
