@@ -212,8 +212,10 @@ const graphColoring = (graph, m) => {
   return colorindexs;
 };
 
-// 绘制折线
-const drawSVGLine = (svg, root, cityOrder) => {
+// 绘制折线或曲线路径，可配置样式
+const drawSVGLine = (svg, root, cityOrder, lineOpts = {}) => {
+  const { lineType = 'curve', width = 2, color = '#aaa' } = lineOpts;
+
   const recpoints = root.leaves().map(d => {
     return {
       city: d.data.city,
@@ -225,16 +227,22 @@ const drawSVGLine = (svg, root, cityOrder) => {
     .map(city => recpoints.find(point => point.city === city))
     .filter(point => point && isFinite(point.x) && isFinite(point.y));
   if (orderedPoints.length < 2) return;
-  const line = d3.line()
+  if(lineType==='none') return;
+
+  let lineGen = d3.line()
     .x(d => d.x)
-    .y(d => d.y)
-    .curve(d3.curveCatmullRom.alpha(0.5));
+    .y(d => d.y);
+  if(lineType === 'curve') {
+    lineGen.curve(d3.curveCatmullRom.alpha(0.5));
+  } else if(lineType === 'polyline') {
+    lineGen.curve(d3.curveLinear);
+  }
   svg.append("path")
     .datum(orderedPoints)
     .attr("fill", "none")
-    .attr("stroke", "black")
-    .attr("stroke-width", 7)
-    .attr("d", line);
+    .attr("stroke", color)
+    .attr("stroke-width", width)
+    .attr("d", lineGen);
 };
 
 // 绘制单个词云
@@ -296,7 +304,11 @@ const drawAllWordClouds = (svg, data, cityOrder, width, height, lineType) => {
   graph = buildAdjacencyMatrix(leaves);
   const colorindexs = graphColoring(graph, poiStore.colorNum);
 
-  drawSVGLine(svg, root, cityOrder);
+  drawSVGLine(svg, root, cityOrder, {
+    lineType: poiStore.linePanel?.type,
+    width: poiStore.linePanel?.width,
+    color: poiStore.linePanel?.color
+  });
 
   const cityInfo = {};
   leaves.forEach(d => {
@@ -438,6 +450,17 @@ watch(
 watch(
   () => poiStore.fontSettings,
   (newVal, oldVal) => {
+    if (poiStore.hasDrawing) {
+      handleRenderCloud();
+    }
+  },
+  { deep: true }
+);
+
+// setup标签云watch监听linePanel配置
+watch(
+  () => ({...poiStore.linePanel}),
+  (val) => {
     if (poiStore.hasDrawing) {
       handleRenderCloud();
     }
