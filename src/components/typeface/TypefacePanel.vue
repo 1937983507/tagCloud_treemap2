@@ -9,10 +9,12 @@
       <div class="section-content">
         <div class="fontsize-row">
           <span class="fontsize-label">最小字号：</span>
-          <el-input-number v-model="localSettings.minFontSize" :min="8" :max="120" :step="2" @change="() => poiStore.updateFontLevel({ minFontSize: localSettings.minFontSize })" />
+          <el-input-number v-model="localSettings.minFontSize" :min="2" :max="120" :step="2" @change="() => poiStore.updateFontLevel({ minFontSize: localSettings.minFontSize })" />
           <span class="fontsize-unit">px</span>
-          <span class="fontsize-label" style="margin-left:40px">最大字号：</span>
-          <el-input-number v-model="localSettings.maxFontSize" :min="8" :max="120" :step="2" @change="() => poiStore.updateFontLevel({ maxFontSize: localSettings.maxFontSize })" />
+        </div>
+        <div class="fontsize-row">
+          <span class="fontsize-label">最大字号：</span>
+          <el-input-number v-model="localSettings.maxFontSize" :min="2" :max="120" :step="2" @change="() => poiStore.updateFontLevel({ maxFontSize: localSettings.maxFontSize })" />
           <span class="fontsize-unit">px</span>
         </div>
       </div>
@@ -128,16 +130,18 @@ const fontGroups = [
 ];
 
 function handleWeightChange() {
+  poiStore.setCloudLoading(true);
   poiStore.updateFontLevel({ fontWeight: localSettings.fontWeight });
 }
 function handleFamilyChange(font) {
+  poiStore.setCloudLoading(true);
   poiStore.updateFontLevel({ fontFamily: font });
 }
 </script>
 
 <style scoped>
 .typeface-panel {
-  min-height: calc(100vh - 160px);
+  /* min-height: calc(100vh - 160px); */
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -221,7 +225,7 @@ function handleFamilyChange(font) {
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 12px;
   margin-top: 0;
-  max-height: 300px;
+  max-height: 450px;
   overflow-y: auto;
   padding: 4px;
 }
@@ -269,7 +273,12 @@ function handleFamilyChange(font) {
   border-radius: 10px;
   font-weight: 500;
 }
-.fontsize-row {display:flex;align-items:center;gap:12px;margin:10px 0;}
+.fontsize-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 10px 0 0 0;
+}
 .fontsize-label {font-size:14px;color:#606266;min-width:68px;}
 .fontsize-unit {font-size:12px;color:#909399;}
 </style>

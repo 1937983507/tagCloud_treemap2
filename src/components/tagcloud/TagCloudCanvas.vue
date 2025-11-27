@@ -29,7 +29,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, nextTick, watch } from 'vue';
+import { ref, onMounted, onBeforeUnmount, nextTick, watch, computed } from 'vue';
 import { usePoiStore } from '@/stores/poiStore';
 import * as d3 from 'd3';
 import cloud from 'd3-cloud';
@@ -42,7 +42,7 @@ let svg = null;
 let graph = null;
 
 // loading 遮罩状态
-const cloudLoading = ref(false);
+const cloudLoading = computed(() => poiStore.cloudLoading);
 
 // 优化动态分配字号——对数插值算法
 function updateFontSizesForCompiledData(compiledData, fontSettings) {
@@ -335,7 +335,7 @@ const drawAllWordClouds = (svg, data, cityOrder, width, height, lineType) => {
 };
 
 const handleRenderCloud = async () => {
-  cloudLoading.value = true;
+  poiStore.setCloudLoading(true);
   try {
     console.info('[TagCloudCanvas] handleRenderCloud 开始', {
       hasDrawing: poiStore.hasDrawing,
@@ -370,7 +370,7 @@ const handleRenderCloud = async () => {
     await nextTick();
     drawAllWordClouds(svg, data, cityOrder, width, height, lineType);
   } finally {
-    cloudLoading.value = false;
+    poiStore.setCloudLoading(false);
   }
 };
 
