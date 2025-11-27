@@ -16,6 +16,7 @@
           <PoiContent ref="poiContentRef" v-show="activePanel === 'content'" />
           <TypefacePanel v-show="activePanel === 'typeface'" />
           <ColorPanel v-show="activePanel === 'color'" />
+          <LayoutPanel v-show="activePanel === 'layout'" />
         </div>
         <SplitterBar />
         <TagCloudCanvas ref="tagCloudCanvasRef" />
@@ -35,6 +36,7 @@ import TypefacePanel from '@/components/typeface/TypefacePanel.vue';
 import ColorPanel from '@/components/color/ColorPanel.vue';
 import TagCloudCanvas from '@/components/tagcloud/TagCloudCanvas.vue';
 import SplitterBar from '@/components/common/SplitterBar.vue';
+import LayoutPanel from '@/components/layout/LayoutPanel.vue';
 
 const activePanel = ref('content');
 const headerRef = ref(null);
@@ -87,8 +89,8 @@ const restartIntro = () => {
 }
 
 .workspace {
-  padding: 24px 0px 24px 24px;
-  background: #f7f9fc;
+  padding: 18px;
+  background: #ffffff;
   min-height: 0;
   height: 100%;
 }
