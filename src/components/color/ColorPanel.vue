@@ -207,7 +207,7 @@ onMounted(() => {
 
 <style scoped>
 .color-panel {
-  min-height: calc(100vh - 160px);
+  /* min-height: calc(100vh - 160px); */
   display: flex;
   flex-direction: column;
   gap: 16px;

@@ -23,6 +23,7 @@ import {
   BrushFilled,
   Collection,
   EditPen,
+  Grid,
 } from '@element-plus/icons-vue';
 
 defineProps({
@@ -38,6 +39,7 @@ const mainMenu = [
   { key: 'content', label: '内容', icon: Collection },
   { key: 'typeface', label: '字体', icon: EditPen },
   { key: 'color', label: '配色', icon: BrushFilled },
+  { key: 'layout', label: '布局', icon: Grid }, // 补充Grid图标
 ];
 
 const handleHelpClick = () => {

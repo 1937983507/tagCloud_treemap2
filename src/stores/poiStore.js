@@ -30,7 +30,7 @@ export const usePoiStore = defineStore('poiStore', {
       inverted: false,
       // 移除 discreteMethod, discreteCount
     },
-    lineType: 'Pivot', // 默认线型
+    lineType: 'Resquarify', // 默认布局方式已调整为Resquarify
     colorNum: 4, // 默认颜色数量
     Colors: ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'], // 简化后保持和palette一致，随palette变
     cloudLoading: false, // 标签云遮罩 loading 状态
@@ -185,6 +185,9 @@ export const usePoiStore = defineStore('poiStore', {
     },
     setCloudLoading(isLoading) {
       this.cloudLoading = isLoading;
+    },
+    setLayoutType(type) {
+      this.lineType = type;
     },
   },
 });
