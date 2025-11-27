@@ -4,7 +4,9 @@
       <el-button type="primary" @click="handleRenderCloud">运行生成标签云</el-button>
     </header>
     <div class="canvas-wrapper" ref="wrapperRef">
-      <svg ref="svgRef"></svg>
+      <svg ref="svgRef"
+           :style="{ background: poiStore.colorSettings.background }"
+      ></svg>
       <div v-if="!poiStore.hasDrawing || !poiStore.cityOrder.length" class="empty-cloud-hint">
         <div class="hint-content">
           <div class="hint-icon">
@@ -395,6 +397,18 @@ onMounted(() => {
     svg = d3.select(svgRef.value);
     svg.attr("width", rect.width).attr("height", rect.height);
   }
+  // 新增：监听配色变化事件
+  window.__refreshTagCloudListener__ = () => {
+    if (poiStore.hasDrawing) {
+      handleRenderCloud();
+    }
+  };
+  window.addEventListener('refreshTagCloud', window.__refreshTagCloudListener__);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('refreshTagCloud', window.__refreshTagCloudListener__);
+  delete window.__refreshTagCloudListener__;
 });
 
 watch(
@@ -434,7 +448,7 @@ watch(
 
 <style scoped>
 .tagcloud-panel {
-  background: #01030c;
+  background:rgb(247,249,252);
   color: #fff;
   padding: 24px;
   display: flex;
@@ -482,7 +496,7 @@ svg {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, rgba(5, 8, 22, 0.95) 0%, rgba(12, 16, 36, 0.9) 100%);
+  background: rgba(255, 255, 255, 0);
   backdrop-filter: blur(8px);
   z-index: 5;
   pointer-events: none;
@@ -502,7 +516,7 @@ svg {
 .hint-icon {
   width: 80px;
   height: 80px;
-  color: rgba(255, 255, 255, 0.3);
+  color: rgba(104, 104, 104, 0.549);
   animation: float 3s ease-in-out infinite;
 }
 
@@ -525,7 +539,7 @@ svg {
   margin: 0;
   font-size: 20px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(104, 104, 104, 0.549);
   letter-spacing: 0.5px;
 }
 
@@ -533,7 +547,7 @@ svg {
   margin: 0;
   font-size: 14px;
   line-height: 1.6;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(104, 104, 104, 0.549);
   letter-spacing: 0.3px;
 }
 .cloud-loading-overlay {

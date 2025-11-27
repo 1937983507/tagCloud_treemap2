@@ -49,35 +49,6 @@
           </div>
         </div>
 
-        <!-- 颜色离散设置 -->
-        <div class="discrete-settings">
-          <div class="color-item spaced">
-            <div class="label">颜色离散数量：</div>
-            <el-input-number 
-              v-model="colorDiscreteCount" 
-              :min="3" 
-              :max="7" 
-              @change="handleColorCountChange"
-              style="width: 120px"
-            />
-          </div>
-          <div class="color-item spaced">
-            <div class="label">颜色离散方式：</div>
-            <el-select 
-              v-model="discreteMethod" 
-              placeholder="请选择" 
-              style="width: 200px"
-              @change="handleDiscreteMethodChange"
-            >
-              <el-option label="相等间隔" value="equal" />
-              <el-option label="分位数" value="quantile" />
-              <el-option label="自然间断点(Jenks)" value="jenks" />
-              <el-option label="几何间隔" value="geometric" />
-              <el-option label="标准差" value="stddev" />
-            </el-select>
-          </div>
-        </div>
-
         <!-- 配色方案选择 -->
         <div class="scheme-selection">
           <div class="scheme-header">
@@ -117,113 +88,67 @@ import { ribbonColorSchemes } from './ribbonColorSchemes';
 const poiStore = usePoiStore();
 
 const localSettings = ref({ ...poiStore.colorSettings });
-const colorDiscreteCount = ref(5);
-const discreteMethod = ref('quantile');
-const currentRibbonIndex = ref(2); // 默认使用第三个配色方案（索引2）
+// 只保留4色带
+const currentRibbonIndex = ref(1); // 默认第二组配色方案，索引为1
 
-// 当前色带
 const currentRibbon = computed(() => {
   return localSettings.value.palette || [];
 });
 
-// 可用的色带方案（根据离散数量筛选）- 使用computed缓存
 const availableRibbons = computed(() => {
-  const count = colorDiscreteCount.value;
-  const schemes = ribbonColorSchemes[count - 3] || [];
+  const schemes = ribbonColorSchemes[1] || [];
   return schemes.map(scheme => scheme.map(c => `rgb(${c.join(',')})`));
 });
 
-// 初始化：根据当前palette找到对应的色带索引，如果没有匹配则使用第一个方案
 watch(
   () => poiStore.colorSettings,
   (settings) => {
     localSettings.value = { ...settings };
-    const newCount = settings.discreteCount || settings.palette?.length || 5;
-    discreteMethod.value = settings.discreteMethod || 'quantile';
-    
-    // 如果颜色数量改变了，需要重新选择配色方案
-    if (colorDiscreteCount.value !== newCount) {
-      colorDiscreteCount.value = newCount;
-      // 使用nextTick确保computed已更新
-      nextTick(() => {
-        if (availableRibbons.value.length > 0) {
-          // 尝试找到匹配的色带索引
-          const paletteStr = JSON.stringify(settings.palette?.map(c => {
-            if (c.startsWith('rgb')) return c;
-            if (c.startsWith('#')) {
-              const hex = c.slice(1);
-              const r = parseInt(hex.slice(0, 2), 16);
-              const g = parseInt(hex.slice(2, 4), 16);
-              const b = parseInt(hex.slice(4, 6), 16);
-              return `rgb(${r},${g},${b})`;
-            }
-            return c;
-          }) || []);
-          
-          const schemes = availableRibbons.value;
-          const index = schemes.findIndex(scheme => {
-            const schemeStr = JSON.stringify(scheme);
-            return schemeStr === paletteStr;
-          });
-          
-          if (index !== -1) {
-            currentRibbonIndex.value = index;
-          } else {
-            // 如果没有匹配，使用第三个方案（索引2，如果存在）并更新store
-            const defaultIndex = Math.min(2, availableRibbons.value.length - 1);
-            currentRibbonIndex.value = defaultIndex;
-            if (availableRibbons.value.length > 0) {
-              poiStore.updateColorSettings({
-                palette: availableRibbons.value[defaultIndex],
-                discreteCount: newCount,
-              });
-            }
+    // 只允许4色带
+    nextTick(() => {
+      if (availableRibbons.value.length > 0) {
+        const paletteStr = JSON.stringify(settings.palette?.map(c => {
+          if (c.startsWith('rgb')) return c;
+          if (c.startsWith('#')) {
+            const hex = c.slice(1);
+            const r = parseInt(hex.slice(0, 2), 16);
+            const g = parseInt(hex.slice(2, 4), 16);
+            const b = parseInt(hex.slice(4, 6), 16);
+            return `rgb(${r},${g},${b})`;
           }
-        }
-      });
-    } else {
-      // 颜色数量没变，只尝试匹配索引
-      nextTick(() => {
-        if (settings.palette && settings.palette.length >= 3) {
-          const paletteStr = JSON.stringify(settings.palette.map(c => {
-            if (c.startsWith('rgb')) return c;
-            if (c.startsWith('#')) {
-              const hex = c.slice(1);
-              const r = parseInt(hex.slice(0, 2), 16);
-              const g = parseInt(hex.slice(2, 4), 16);
-              const b = parseInt(hex.slice(4, 6), 16);
-              return `rgb(${r},${g},${b})`;
-            }
-            return c;
-          }));
-          
-          const schemes = availableRibbons.value;
-          const index = schemes.findIndex(scheme => {
-            const schemeStr = JSON.stringify(scheme);
-            return schemeStr === paletteStr;
+          return c;
+        }) || []);
+
+        const schemes = availableRibbons.value;
+        const index = schemes.findIndex(scheme => {
+          const schemeStr = JSON.stringify(scheme);
+          return schemeStr === paletteStr;
+        });
+
+        if (index !== -1) {
+          currentRibbonIndex.value = index;
+        } else {
+          // 默认第二组方案索引1
+          const defaultIndex = 1;
+          currentRibbonIndex.value = defaultIndex;
+          poiStore.updateColorSettings({
+            palette: availableRibbons.value[defaultIndex],
           });
-          if (index !== -1) {
-            currentRibbonIndex.value = index;
-          }
         }
-      });
-    }
+      }
+    });
   },
   { immediate: true, deep: true }
 );
 
-// 背景色变化 - 立即更新
 const handleBackgroundChange = (color) => {
   if (!color) return;
-  // 确保localSettings同步
   localSettings.value.background = color;
-  // 立即更新store和canvas
   poiStore.updateColorSettings({
     background: color,
   });
 };
 
-// 颜色翻转 - 使用防抖
 let flipTimer = null;
 const handleColorFlip = () => {
   if (flipTimer) clearTimeout(flipTimer);
@@ -237,42 +162,24 @@ const handleColorFlip = () => {
   }, 50);
 };
 
-// 颜色数量改变 - 使用防抖
-let countChangeTimer = null;
-const handleColorCountChange = () => {
-  if (countChangeTimer) clearTimeout(countChangeTimer);
-  countChangeTimer = setTimeout(() => {
-    if (availableRibbons.value.length > 0) {
-      // 使用第三个方案（索引2，如果存在）
-      const defaultIndex = Math.min(2, availableRibbons.value.length - 1);
-      currentRibbonIndex.value = defaultIndex;
-      handleRibbonSchemeSelect(defaultIndex);
-      poiStore.updateColorSettings({
-        discreteCount: colorDiscreteCount.value,
-      });
-    }
-  }, 100);
-};
-
-// 离散方式改变
-const handleDiscreteMethodChange = () => {
-  poiStore.updateColorSettings({
-    discreteMethod: discreteMethod.value,
-  });
-};
-
-// 配色方案选择 - 立即响应
 const handleRibbonSchemeSelect = (index) => {
   currentRibbonIndex.value = index;
   const selectedScheme = availableRibbons.value[index];
   localSettings.value.palette = selectedScheme;
   poiStore.updateColorSettings({
     palette: selectedScheme,
-    discreteCount: colorDiscreteCount.value,
   });
+  // 通知主视图区刷新标签云
+  if (poiStore.hasDrawing) {
+    // 假定有 handleRenderCloud 方法/动作
+    setTimeout(()=>{
+      if(window && window.dispatchEvent){
+        window.dispatchEvent(new CustomEvent('refreshTagCloud'));
+      }
+    }, 50);
+  }
 };
 
-// 初始化时确保使用第三个配色方案（如果当前palette不匹配任何方案）
 onMounted(() => {
   nextTick(() => {
     if (availableRibbons.value.length > 0) {
@@ -285,15 +192,12 @@ onMounted(() => {
         }
         return false;
       });
-      
-      // 如果没有匹配的方案，使用第三个方案（索引2，如果存在）
       if (!matched) {
-        const defaultIndex = Math.min(2, availableRibbons.value.length - 1);
+        const defaultIndex = 1;
         const defaultScheme = availableRibbons.value[defaultIndex];
         currentRibbonIndex.value = defaultIndex;
         poiStore.updateColorSettings({
           palette: defaultScheme,
-          discreteCount: colorDiscreteCount.value,
         });
       }
     }

@@ -25,15 +25,14 @@ export const usePoiStore = defineStore('poiStore', {
       fontWeight: '700',
     },
     colorSettings: {
-      background: '#0c1024',
-      palette: ['rgb(240,249,232)', 'rgb(186,228,188)', 'rgb(123,204,196)', 'rgb(67,162,202)', 'rgb(8,104,172)'],
+      background: 'rgb(255, 255, 255)',
+      palette: ['rgb(31,119,180)', 'rgb(255,127,14)', 'rgb(44,160,44)', 'rgb(214,39,40)'],
       inverted: false,
-      discreteMethod: 'quantile',
-      discreteCount: 5,
+      // 移除 discreteMethod, discreteCount
     },
     lineType: 'Pivot', // 默认线型
     colorNum: 4, // 默认颜色数量
-    Colors: ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2"], // 默认颜色数组
+    Colors: ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'], // 简化后保持和palette一致，随palette变
     cloudLoading: false, // 标签云遮罩 loading 状态
   }),
   getters: {
@@ -171,6 +170,18 @@ export const usePoiStore = defineStore('poiStore', {
         ...this.colorSettings,
         ...payload,
       };
+      // 若 palette 改变，Colors 跟随
+      if (payload.palette) {
+        // palette 为 ['rgb(r,g,b)', ...]，需转成颜色字符串
+        this.Colors = payload.palette.map(rgb => {
+          if (rgb.startsWith('rgb')) {
+            const rgbArr = rgb.match(/\d+/g);
+            if (!rgbArr) return rgb;
+            return '#' + rgbArr.map(x => (+x).toString(16).padStart(2,'0')).join('');
+          }
+          return rgb;
+        });
+      }
     },
     setCloudLoading(isLoading) {
       this.cloudLoading = isLoading;
