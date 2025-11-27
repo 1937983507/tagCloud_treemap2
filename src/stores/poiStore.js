@@ -19,8 +19,8 @@ export const usePoiStore = defineStore('poiStore', {
     cityOrder: [], // 城市顺序
     compiledData: {}, // 编译后的数据（按城市分组）
     fontSettings: {
-      levelCount: 5,
-      fontSizes: [64, 52, 44, 36, 28, 24, 20],
+      minFontSize: 10,
+      maxFontSize: 40,
       fontFamily: '等线',
       fontWeight: '700',
     },
@@ -34,6 +34,7 @@ export const usePoiStore = defineStore('poiStore', {
     lineType: 'Pivot', // 默认线型
     colorNum: 4, // 默认颜色数量
     Colors: ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2"], // 默认颜色数组
+    cloudLoading: false, // 标签云遮罩 loading 状态
   }),
   getters: {
     totalCount: (state) => state.poiList.length,
@@ -170,6 +171,9 @@ export const usePoiStore = defineStore('poiStore', {
         ...this.colorSettings,
         ...payload,
       };
+    },
+    setCloudLoading(isLoading) {
+      this.cloudLoading = isLoading;
     },
   },
 });
