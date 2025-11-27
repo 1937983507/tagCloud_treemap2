@@ -434,7 +434,7 @@ watch(
 
 <style scoped>
 .tagcloud-panel {
-  background: #01030c;
+  background:rgb(247,249,252);
   color: #fff;
   padding: 24px;
   display: flex;
@@ -482,7 +482,7 @@ svg {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, rgba(5, 8, 22, 0.95) 0%, rgba(12, 16, 36, 0.9) 100%);
+  background: rgb(255, 255, 255);
   backdrop-filter: blur(8px);
   z-index: 5;
   pointer-events: none;
@@ -502,7 +502,7 @@ svg {
 .hint-icon {
   width: 80px;
   height: 80px;
-  color: rgba(255, 255, 255, 0.3);
+  color: rgba(104, 104, 104, 0.549);
   animation: float 3s ease-in-out infinite;
 }
 
@@ -525,7 +525,7 @@ svg {
   margin: 0;
   font-size: 20px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(104, 104, 104, 0.549);
   letter-spacing: 0.5px;
 }
 
@@ -533,7 +533,7 @@ svg {
   margin: 0;
   font-size: 14px;
   line-height: 1.6;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(104, 104, 104, 0.549);
   letter-spacing: 0.3px;
 }
 .cloud-loading-overlay {
