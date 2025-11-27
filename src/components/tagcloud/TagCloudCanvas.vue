@@ -397,6 +397,18 @@ onMounted(() => {
     svg = d3.select(svgRef.value);
     svg.attr("width", rect.width).attr("height", rect.height);
   }
+  // 新增：监听配色变化事件
+  window.__refreshTagCloudListener__ = () => {
+    if (poiStore.hasDrawing) {
+      handleRenderCloud();
+    }
+  };
+  window.addEventListener('refreshTagCloud', window.__refreshTagCloudListener__);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('refreshTagCloud', window.__refreshTagCloudListener__);
+  delete window.__refreshTagCloudListener__;
 });
 
 watch(
