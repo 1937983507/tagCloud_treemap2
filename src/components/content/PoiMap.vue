@@ -56,55 +56,8 @@ import { usePoiStore } from '@/stores/poiStore';
 import AMapLoader from '@amap/amap-jsapi-loader';
 import { onMounted, onBeforeUnmount, ref, watch, nextTick } from 'vue';
 import * as turf from '@turf/turf';
-
-// 动态加载geojson数据
-let geojsonData = null;
-const loadGeoJsonData = async () => {
-  if (geojsonData) return geojsonData;
-  try {
-    geojsonData = await loadGeoJsonAsJson();
-    if (geojsonData) {
-      window.geojson = geojsonData;
-      console.log('geojson数据加载成功（通过fetch）');
-    }
-    return geojsonData;
-  } catch (error) {
-    console.error('加载geojson数据失败:', error);
-    return { features: [] };
-  }
-};
-
-// 直接通过fetch加载JSON数据，并处理var/const赋值形式
-const loadGeoJsonAsJson = async () => {
-  const response = await fetch('/data/shi.js');
-  if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}`);
-  }
-  const text = await response.text();
-  let jsonData;
-  try {
-    jsonData = JSON.parse(text);
-  } catch (jsonError) {
-    const trimmed = text.trim();
-    const assignmentRegex = /^(?:const|let|var)\s+geojson\s*=\s*/;
-    let candidate = trimmed.replace(assignmentRegex, '').trim();
-    if (candidate.endsWith(';')) {
-      candidate = candidate.slice(0, -1).trim();
-    }
-    try {
-      jsonData = JSON.parse(candidate);
-    } catch (assignmentError) {
-      console.warn('尝试解析geojson赋值内容失败，尝试eval处理');
-      eval(trimmed);
-      if (window.geojson) {
-        jsonData = window.geojson;
-      } else {
-        throw new Error('无法解析geojson数据');
-      }
-    }
-  }
-  return jsonData;
-};
+import { loadGeoJson } from '@/utils/geojsonLoader';
+import { normalizeCityName } from '@/utils/normalizeCityName';
 
 const poiStore = usePoiStore();
 const mapRef = ref(null);
@@ -162,30 +115,29 @@ const densifyPath = (path, segmentLength) => {
 // 获得折线经过的城市名
 const getAdministrativeRegions = async (path) => {
   const administrativeRegions = new Set();
-  const geoData = await loadGeoJsonData();
-  if (!geoData || !geoData.features) {
-    console.warn('geojson数据未加载', geoData);
-    return administrativeRegions;
-  }
-  path.forEach(coord => {
-    const point = turf.point(coord);
-    geoData.features.forEach(feature => {
-      if (turf.booleanPointInPolygon(point, feature)) {
-        const cityName = feature.properties?.shi || feature.properties?.name;
-        if (cityName) {
-          administrativeRegions.add(cityName);
-        }
-      }
-    });
-  });
-  return administrativeRegions;
-};
+  try {
+    const geoData = await loadGeoJson();
+    if (!geoData || !geoData.features) {
+      console.warn('geojson数据未加载', geoData);
+      return administrativeRegions;
+    }
 
-// 规范化城市名（去除常见后缀，消除空格）
-const normalizeCityName = (name = '') => {
-  return name
-    .replace(/\s+/g, '')
-    .replace(/(市|地区|自治州|自治县|盟|州|特别行政区)$/, '');
+    path.forEach(coord => {
+      const point = turf.point(coord);
+      geoData.features.forEach(feature => {
+        if (turf.booleanPointInPolygon(point, feature)) {
+          const cityName = feature.properties?.shi || feature.properties?.name;
+          if (cityName) {
+            administrativeRegions.add(cityName);
+          }
+        }
+      });
+    });
+  } catch (error) {
+    console.error('[PoiMap] 获取城市边界失败', error);
+  }
+
+  return administrativeRegions;
 };
 
 // 根据城市名筛选POI数据
@@ -329,7 +281,7 @@ const loadMap = async () => {
     });
     
     // 异步预加载geojson数据（不阻塞地图显示）
-    loadGeoJsonData().catch(err => {
+    loadGeoJson().catch(err => {
       console.warn('预加载geojson数据失败，将在需要时重试:', err);
     });
 

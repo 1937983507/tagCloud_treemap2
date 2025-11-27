@@ -4,20 +4,14 @@
       <div class="map-container">
         <PoiMap />
       </div>
-      <!-- table-card留空，后续添加其他内容 -->
-      <div class="table-card-placeholder"></div>
+      <LocationGraph class="table-card-placeholder" />
     </div>
   </section>
 </template>
 
 <script setup>
-import { onMounted } from 'vue';
-import { usePoiStore } from '@/stores/poiStore';
 import PoiMap from './PoiMap.vue';
-
-const poiStore = usePoiStore();
-
-// POI数据加载已移至PoiMap组件的loadMap函数中，避免重复加载
+import LocationGraph from './LocationGraph.vue';
 </script>
 
 <style scoped>
