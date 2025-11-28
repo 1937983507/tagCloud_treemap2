@@ -5,7 +5,11 @@
       @navigate="handleNavigate"
       @start-tutorial="restartIntro"
     />
-    <template v-if="!showHelpPage && !showFeedbackPage">
+    <FeedbackPage
+      v-if="showFeedbackPage && !showHelpPage"
+      @navigate="handleNavigate"
+    />
+    <template v-else-if="!showHelpPage">
       <div class="app-body">
         <SideMenu
           :active-panel="activePanel"
@@ -41,6 +45,7 @@ import TagCloudCanvas from '@/components/tagcloud/TagCloudCanvas.vue';
 import SplitterBar from '@/components/common/SplitterBar.vue';
 import LayoutPanel from '@/components/layout/LayoutPanel.vue';
 import LinePanel from '@/components/line/LinePanel.vue';
+import FeedbackPage from '@/components/feedback/FeedbackPage.vue';
 
 const activePanel = ref('content');
 const headerRef = ref(null);
