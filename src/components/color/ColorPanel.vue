@@ -104,7 +104,7 @@ watch(
   () => poiStore.colorSettings,
   (settings) => {
     localSettings.value = { ...settings };
-    // 只允许4色带
+    // 保持只允许四色带，但如果 palette 不是标准候选色带之一（如翻转后），允许索引为 -1
     nextTick(() => {
       if (availableRibbons.value.length > 0) {
         const paletteStr = JSON.stringify(settings.palette?.map(c => {
@@ -124,17 +124,7 @@ watch(
           const schemeStr = JSON.stringify(scheme);
           return schemeStr === paletteStr;
         });
-
-        if (index !== -1) {
-          currentRibbonIndex.value = index;
-        } else {
-          // 默认第二组方案索引1
-          const defaultIndex = 1;
-          currentRibbonIndex.value = defaultIndex;
-          poiStore.updateColorSettings({
-            palette: availableRibbons.value[defaultIndex],
-          });
-        }
+        currentRibbonIndex.value = index;
       }
     });
   },
@@ -154,11 +144,20 @@ const handleColorFlip = () => {
   if (flipTimer) clearTimeout(flipTimer);
   flipTimer = setTimeout(() => {
     const reversed = [...currentRibbon.value].reverse();
+    // 只更新palette，currentRibbonIndex不变
     localSettings.value.palette = reversed;
     poiStore.updateColorSettings({
       palette: reversed,
       inverted: !localSettings.value.inverted,
     });
+    // 通知主视图区刷新标签云
+    if (poiStore.hasDrawing) {
+      setTimeout(() => {
+        if (window && window.dispatchEvent) {
+          window.dispatchEvent(new CustomEvent('refreshTagCloud'));
+        }
+      }, 50);
+    }
   }, 50);
 };
 
