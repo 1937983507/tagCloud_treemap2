@@ -95,6 +95,10 @@ const wrapperRef = ref(null);
 const svgRef = ref(null);
 let svg = null;
 let graph = null;
+// 保存当前的布局信息，用于只更新路径
+let currentRoot = null;
+let currentCityOrder = null;
+let currentLayoutType = null;
 
 // loading 遮罩状态
 const cloudLoading = computed(() => poiStore.cloudLoading);
@@ -280,7 +284,11 @@ const drawSVGLine = (svg, root, cityOrder, lineOpts = {}) => {
     .map(city => recpoints.find(point => point.city === city))
     .filter(point => point && isFinite(point.x) && isFinite(point.y));
   if (orderedPoints.length < 2) return;
-  if(lineType==='none') return;
+  if(lineType==='none') {
+    // 如果类型为none，删除已存在的路径
+    svg.select("#city-route-path").remove();
+    return;
+  }
 
   let lineGen = d3.line()
     .x(d => d.x)
@@ -290,12 +298,42 @@ const drawSVGLine = (svg, root, cityOrder, lineOpts = {}) => {
   } else if(lineType === 'polyline') {
     lineGen.curve(d3.curveLinear);
   }
-  svg.append("path")
+  
+  // 先删除已存在的路径（如果存在）
+  svg.select("#city-route-path").remove();
+  
+  // 创建新路径，添加特定ID以便后续更新
+  // 确保路径在 SVG 的最前面（作为第一个子元素），这样词云会覆盖在路径上方
+  const svgNode = svg.node();
+  const firstChild = svgNode?.firstChild;
+  
+  // 使用 insert 方法，将路径插入到第一个元素之前（如果存在），否则插入到最前面
+  const path = svg.insert("path", firstChild ? () => firstChild : null)
+    .attr("id", "city-route-path")
     .datum(orderedPoints)
     .attr("fill", "none")
     .attr("stroke", color)
     .attr("stroke-width", width)
     .attr("d", lineGen);
+  
+  // 双重保险：确保路径是第一个子元素
+  const pathNode = path.node();
+  if (svgNode && pathNode && svgNode.firstChild !== pathNode) {
+    svgNode.insertBefore(pathNode, svgNode.firstChild);
+  }
+};
+
+// 只更新路径样式，不重新绘制整个标签云
+const updatePathOnly = () => {
+  if (!svg || !currentRoot || !currentCityOrder) return;
+  
+  const lineOpts = {
+    lineType: poiStore.linePanel?.type || 'curve',
+    width: poiStore.linePanel?.width || 2,
+    color: poiStore.linePanel?.color || '#aaa'
+  };
+  
+  drawSVGLine(svg, currentRoot, currentCityOrder, lineOpts);
 };
 
 // 绘制单个词云
@@ -363,6 +401,11 @@ const drawAllWordClouds = async (svg, data, cityOrder, width, height, lineType) 
   await new Promise(resolve => setTimeout(resolve, 0));
   const colorindexs = graphColoring(graph, poiStore.colorNum);
 
+  // 保存当前布局信息，用于后续只更新路径
+  currentRoot = root;
+  currentCityOrder = cityOrder;
+  currentLayoutType = lineType;
+
   drawSVGLine(svg, root, cityOrder, {
     lineType: poiStore.linePanel?.type,
     width: poiStore.linePanel?.width,
@@ -417,7 +460,7 @@ const handleRenderCloud = async () => {
   await new Promise(resolve => requestAnimationFrame(resolve));
   
   const startTime = Date.now();
-  const minDisplayTime = 300; // 最小显示时间 300ms，确保用户能看到 loading
+  const minDisplayTime = 10; // 最小显示时间 300ms，确保用户能看到 loading
   
   try {
     console.info('[TagCloudCanvas] handleRenderCloud 开始', {
@@ -445,6 +488,10 @@ const handleRenderCloud = async () => {
     svg = d3.select(svgRef.value);
     svg.selectAll("*").remove();
     svg.attr("width", width).attr("height", height);
+    // 清空保存的布局信息
+    currentRoot = null;
+    currentCityOrder = null;
+    currentLayoutType = null;
     const data = poiStore.compiledData;
     const cityOrder = poiStore.cityOrder;
     const lineType = poiStore.lineType || 'Pivot';
@@ -594,6 +641,10 @@ watch(
   (hasDrawing) => {
     if (!hasDrawing && svg) {
       svg.selectAll("*").remove();
+      // 清空保存的布局信息
+      currentRoot = null;
+      currentCityOrder = null;
+      currentLayoutType = null;
     }
   }
 );
@@ -633,11 +684,15 @@ watch(
   }
 );
 
-// setup标签云watch监听linePanel配置
+// setup标签云watch监听linePanel配置 - 只更新路径，不重绘整个标签云
 watch(
   () => ({...poiStore.linePanel}),
   (val) => {
-    if (poiStore.hasDrawing) {
+    if (poiStore.hasDrawing && currentRoot && currentCityOrder) {
+      // 如果已经有绘制好的标签云，只更新路径元素
+      updatePathOnly();
+    } else if (poiStore.hasDrawing) {
+      // 如果还没有绘制，需要完整渲染
       handleRenderCloud();
     }
   },
