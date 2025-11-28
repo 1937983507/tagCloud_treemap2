@@ -55,7 +55,6 @@ const lineColor = ref(poiStore.linePanel?.color || '#aaa');
 
 function updateLineType(val) {
   poiStore.setLinePanel({ type: val, width: lineWidth.value, color: lineColor.value });
-  poiStore.lineType = val; // 如果旧代码路径需要
 }
 function updateLineWidth(val) {
   poiStore.setLinePanel({ type: lineType.value, width: val, color: lineColor.value });
