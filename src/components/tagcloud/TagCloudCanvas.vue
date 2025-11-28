@@ -623,6 +623,16 @@ watch(
   { deep: true }
 );
 
+// watch布局类型变化，自动刷新并显示loading
+watch(
+  () => poiStore.lineType,
+  (newVal, oldVal) => {
+    if (poiStore.hasDrawing && oldVal !== undefined) {
+      handleRenderCloud();
+    }
+  }
+);
+
 // setup标签云watch监听linePanel配置
 watch(
   () => ({...poiStore.linePanel}),
