@@ -130,12 +130,12 @@ const fontGroups = [
 ];
 
 function handleWeightChange() {
-  poiStore.setCloudLoading(true);
   poiStore.updateFontLevel({ fontWeight: localSettings.fontWeight });
+  // 只有在已绘制路线的情况下才触发重绘（TagCloudCanvas.vue 中的 watch 会自动处理）
 }
 function handleFamilyChange(font) {
-  poiStore.setCloudLoading(true);
   poiStore.updateFontLevel({ fontFamily: font });
+  // 只有在已绘制路线的情况下才触发重绘（TagCloudCanvas.vue 中的 watch 会自动处理）
 }
 </script>
 
