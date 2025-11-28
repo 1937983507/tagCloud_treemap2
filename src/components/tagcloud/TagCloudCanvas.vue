@@ -40,7 +40,7 @@
       <svg ref="svgRef"
            :style="{ background: poiStore.colorSettings.background }"
       ></svg>
-      <div v-if="!poiStore.hasDrawing || !poiStore.cityOrder.length" class="empty-cloud-hint">
+      <div v-if="(!poiStore.hasDrawing || !poiStore.cityOrder.length) && !cloudLoading" class="empty-cloud-hint">
         <div class="hint-content">
           <div class="hint-icon">
             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -56,8 +56,17 @@
         </div>
       </div>
       <div v-if="cloudLoading" class="cloud-loading-overlay">
-        <span class="cloud-loading-icon">⏳</span>
-        <span class="cloud-loading-text">标签云生成中...</span>
+        <div class="cloud-loading-spinner">
+          <div class="spinner-dot"></div>
+          <div class="spinner-dot"></div>
+          <div class="spinner-dot"></div>
+          <div class="spinner-dot"></div>
+          <div class="spinner-dot"></div>
+          <div class="spinner-dot"></div>
+          <div class="spinner-dot"></div>
+          <div class="spinner-dot"></div>
+        </div>
+        <span class="cloud-loading-text">请稍等，正在生成标签云...</span>
       </div>
     </div>
   </aside>
@@ -326,7 +335,7 @@ const drawWordCloud = (i, svg, cities, city, x, y, colorIndex, color, width, hei
 };
 
 // 绘制所有的词云
-const drawAllWordClouds = (svg, data, cityOrder, width, height, lineType) => {
+const drawAllWordClouds = async (svg, data, cityOrder, width, height, lineType) => {
   const cityData = calculateAttractionWeights(data, cityOrder);
   
   // 构建层次结构 - 原项目使用values作为children
@@ -345,7 +354,13 @@ const drawAllWordClouds = (svg, data, cityOrder, width, height, lineType) => {
   treemap(root);
 
   const leaves = root.leaves();
+  
+  // 将耗时计算分批进行，让浏览器有机会渲染动画
+  // 使用 setTimeout 让浏览器在计算间隙渲染
+  await new Promise(resolve => setTimeout(resolve, 0));
   graph = buildAdjacencyMatrix(leaves);
+  
+  await new Promise(resolve => setTimeout(resolve, 0));
   const colorindexs = graphColoring(graph, poiStore.colorNum);
 
   drawSVGLine(svg, root, cityOrder, {
@@ -387,13 +402,23 @@ const drawAllWordClouds = (svg, data, cityOrder, width, height, lineType) => {
     cloudPromises.push(promise);
   });
 
-  Promise.all(cloudPromises).then(() => {
+  return Promise.all(cloudPromises).then(() => {
     console.log('所有词云绘制完成');
   });
 };
 
 const handleRenderCloud = async () => {
   poiStore.setCloudLoading(true);
+  // 确保 DOM 更新，让 loading overlay 显示
+  await nextTick();
+  // 使用 requestAnimationFrame 确保浏览器至少渲染一次 loading overlay
+  await new Promise(resolve => requestAnimationFrame(resolve));
+  // 再等待一帧，确保 loading overlay 完全渲染
+  await new Promise(resolve => requestAnimationFrame(resolve));
+  
+  const startTime = Date.now();
+  const minDisplayTime = 300; // 最小显示时间 300ms，确保用户能看到 loading
+  
   try {
     console.info('[TagCloudCanvas] handleRenderCloud 开始', {
       hasDrawing: poiStore.hasDrawing,
@@ -426,8 +451,16 @@ const handleRenderCloud = async () => {
     // 字号分配
     updateFontSizesForCompiledData(data, poiStore.fontSettings);
     await nextTick();
-    drawAllWordClouds(svg, data, cityOrder, width, height, lineType);
+    // 再次让浏览器渲染一次，确保 loading overlay 可见
+    await new Promise(resolve => setTimeout(resolve, 50));
+    // 等待所有词云绘制完成后再关闭 loading
+    await drawAllWordClouds(svg, data, cityOrder, width, height, lineType);
   } finally {
+    // 确保 loading 至少显示最小时间
+    const elapsed = Date.now() - startTime;
+    if (elapsed < minDisplayTime) {
+      await new Promise(resolve => setTimeout(resolve, minDisplayTime - elapsed));
+    }
     poiStore.setCloudLoading(false);
   }
 };
@@ -708,28 +741,92 @@ svg {
 }
 .cloud-loading-overlay {
   position: absolute;
-  z-index: 99;
+  z-index: 999;
   top: 0; left: 0; width: 100%; height: 100%;
-  background: rgba(25, 30, 40, 0.72);
+  background: rgba(255, 255, 255, 0.85);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: #333;
   font-size: 20px;
   pointer-events: all;
   gap: 18px;
-  font-weight: bold;
-  backdrop-filter: blur(2px);
+  font-weight: 500;
+  backdrop-filter: blur(8px);
 }
-.cloud-loading-icon {
-  font-size: 44px;
+
+.cloud-loading-spinner {
+  position: relative;
+  width: 60px;
+  height: 60px;
   margin-bottom: 12px;
-  animation: cloud-spin 1s linear infinite;
+  will-change: transform;
 }
-@keyframes cloud-spin {
-  to {transform: rotate(1turn);}
+
+.spinner-dot {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #409eff;
+  top: 0;
+  left: 50%;
+  transform-origin: 0 30px;
+  will-change: transform, opacity;
+  animation: spinner-rotate 1.2s linear infinite;
 }
-.cloud-loading-text {margin-top: 8px;}
+
+.spinner-dot:nth-child(1) {
+  animation-delay: 0s;
+  opacity: 1;
+}
+
+.spinner-dot:nth-child(2) {
+  animation-delay: 0.15s;
+  opacity: 0.875;
+}
+
+.spinner-dot:nth-child(3) {
+  animation-delay: 0.3s;
+  opacity: 0.75;
+}
+
+.spinner-dot:nth-child(4) {
+  animation-delay: 0.45s;
+  opacity: 0.625;
+}
+
+.spinner-dot:nth-child(5) {
+  animation-delay: 0.6s;
+  opacity: 0.5;
+}
+
+.spinner-dot:nth-child(6) {
+  animation-delay: 0.75s;
+  opacity: 0.375;
+}
+
+.spinner-dot:nth-child(7) {
+  animation-delay: 0.9s;
+  opacity: 0.25;
+}
+
+.spinner-dot:nth-child(8) {
+  animation-delay: 1.05s;
+  opacity: 0.125;
+}
+
+@keyframes spinner-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.cloud-loading-text {
+  margin-top: 8px;
+  color: #606266;
+  font-size: 16px;
+}
 </style>
 
