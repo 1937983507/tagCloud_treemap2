@@ -28,6 +28,7 @@
       </div>
       <FooterBar @navigate="handleNavigate" />
     </template>
+    <HelpPage v-else @navigate="handleNavigate" />
   </div>
 </template>
 
@@ -46,6 +47,7 @@ import SplitterBar from '@/components/common/SplitterBar.vue';
 import LayoutPanel from '@/components/layout/LayoutPanel.vue';
 import LinePanel from '@/components/line/LinePanel.vue';
 import FeedbackPage from '@/components/feedback/FeedbackPage.vue';
+import HelpPage from '@/components/help/HelpPage.vue';
 
 const activePanel = ref('content');
 const headerRef = ref(null);
