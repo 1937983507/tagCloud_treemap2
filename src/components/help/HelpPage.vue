@@ -679,7 +679,7 @@ onBeforeUnmount(() => {
   width: 100%;
   background: #ffffff;
   margin: 0 auto; /* 居中 */
-  padding-bottom: 120px; /* 为 footer 留出足够空间 */
+  // padding-bottom: 120px; /* 为 footer 留出足够空间 */
 }
 
 /* 左右侧导航栏 */
