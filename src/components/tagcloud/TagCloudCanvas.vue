@@ -336,6 +336,50 @@ const updatePathOnly = () => {
   drawSVGLine(svg, currentRoot, currentCityOrder, lineOpts);
 };
 
+// 只更新字体样式，不重新绘制整个标签云
+const updateFontStylesOnly = () => {
+  if (!svg) return;
+  
+  const fontFamily = poiStore.fontSettings.fontFamily || "Arial";
+  const fontWeight = poiStore.fontSettings.fontWeight || "700";
+  
+  // 更新所有文本元素的字体样式
+  svg.selectAll("text.word, text.city-label")
+    .style("font-family", fontFamily)
+    .style("font-weight", fontWeight);
+};
+
+// 只更新颜色，不重新绘制整个标签云
+const updateColorsOnly = () => {
+  if (!svg) return;
+  
+  // 遍历所有词云 group，根据 colorIndex 更新颜色
+  svg.selectAll("g[data-colorindex]").each(function() {
+    const g = d3.select(this);
+    const colorIndexAttr = g.attr("data-colorindex");
+    const colorIndex = parseInt(colorIndexAttr);
+    
+    // 如果 colorIndex 无效，跳过
+    if (isNaN(colorIndex) || colorIndex < 0) {
+      // 城市标签保持红色（colorIndex 为 -1 的情况）
+      g.selectAll("text.city-label")
+        .style("fill", "red");
+      return;
+    }
+    
+    // 获取新的颜色
+    const newColor = poiStore.Colors[colorIndex % poiStore.Colors.length];
+    
+    // 更新该 group 下所有非城市标签的文本颜色
+    g.selectAll("text.word")
+      .style("fill", newColor);
+    
+    // 城市标签保持红色
+    g.selectAll("text.city-label")
+      .style("fill", "red");
+  });
+};
+
 // 绘制单个词云
 const drawWordCloud = (i, svg, cities, city, x, y, colorIndex, color, width, height, resolve) => {
   if (!isFinite(x) || !isFinite(y)) { if(resolve)resolve(); return; }
@@ -622,9 +666,13 @@ onMounted(() => {
     svg = d3.select(svgRef.value);
     svg.attr("width", rect.width).attr("height", rect.height);
   }
-  // 新增：监听配色变化事件
+  // 新增：监听配色变化事件 - 只更新颜色，不重绘整个标签云
   window.__refreshTagCloudListener__ = () => {
-    if (poiStore.hasDrawing) {
+    if (poiStore.hasDrawing && svg) {
+      // 如果已经有绘制好的标签云，只更新颜色
+      updateColorsOnly();
+    } else if (poiStore.hasDrawing) {
+      // 如果还没有绘制，需要完整渲染
       handleRenderCloud();
     }
   };
@@ -663,11 +711,38 @@ watch(
   }
 );
 
-// watch字体设置深度变化，自动刷新并显示loading
+// watch字体设置深度变化 - 区分字号变化和字体样式变化
 watch(
   () => poiStore.fontSettings,
   (newVal, oldVal) => {
-    if (poiStore.hasDrawing) {
+    if (!oldVal) {
+      // 首次初始化，需要完整渲染
+      if (poiStore.hasDrawing) {
+        handleRenderCloud();
+      }
+      return;
+    }
+    
+    // 检查是否是字号变化（minFontSize 或 maxFontSize）
+    const isFontSizeChanged = 
+      newVal.minFontSize !== oldVal.minFontSize || 
+      newVal.maxFontSize !== oldVal.maxFontSize;
+    
+    // 检查是否是字体样式变化（fontFamily 或 fontWeight）
+    const isFontStyleChanged = 
+      newVal.fontFamily !== oldVal.fontFamily || 
+      newVal.fontWeight !== oldVal.fontWeight;
+    
+    if (isFontSizeChanged) {
+      // 字号变化需要重新计算字号分配和布局，需要完整重绘
+      if (poiStore.hasDrawing) {
+        handleRenderCloud();
+      }
+    } else if (isFontStyleChanged && poiStore.hasDrawing && svg) {
+      // 字体样式变化（字体、字重）只需要更新样式，不重绘
+      updateFontStylesOnly();
+    } else if (poiStore.hasDrawing) {
+      // 其他情况，需要完整渲染
       handleRenderCloud();
     }
   },
@@ -691,6 +766,29 @@ watch(
     if (poiStore.hasDrawing && currentRoot && currentCityOrder) {
       // 如果已经有绘制好的标签云，只更新路径元素
       updatePathOnly();
+    } else if (poiStore.hasDrawing) {
+      // 如果还没有绘制，需要完整渲染
+      handleRenderCloud();
+    }
+  },
+  { deep: true }
+);
+
+// watch配色设置变化 - 只更新颜色，不重绘整个标签云
+watch(
+  () => ({...poiStore.colorSettings}),
+  (newVal, oldVal) => {
+    if (!oldVal) {
+      // 首次初始化，需要完整渲染
+      if (poiStore.hasDrawing) {
+        handleRenderCloud();
+      }
+      return;
+    }
+    
+    if (poiStore.hasDrawing && svg) {
+      // 如果已经有绘制好的标签云，只更新颜色
+      updateColorsOnly();
     } else if (poiStore.hasDrawing) {
       // 如果还没有绘制，需要完整渲染
       handleRenderCloud();
