@@ -9,6 +9,7 @@
         :key="item.key"
         size="small"
         text
+        :data-intro-tutorial="item.key === 'tutorial' ? 'tutorial-btn' : undefined"
         @click="handleNavClick(item.key)"
       >
         {{ item.label }}

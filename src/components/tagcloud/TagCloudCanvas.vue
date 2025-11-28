@@ -2,7 +2,13 @@
   <aside class="tagcloud-panel">
     <header class="panel-head">
       <el-space direction="horizontal" alignment="center" size="small">
-        <el-button type="primary" @click="handleRenderCloud">运行生成标签云</el-button>
+        <el-button
+          type="primary"
+          data-intro-target="runTagCloudBtn"
+          @click="handleRenderCloud"
+        >
+          运行生成标签云
+        </el-button>
         <el-dropdown @command="handleExportCommand">
           <el-button>
             导出图片<el-icon style="margin-left:4px"><arrow-down /></el-icon>
@@ -74,6 +80,8 @@
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount, nextTick, watch, computed } from 'vue';
+import introJs from 'intro.js';
+import 'intro.js/minified/introjs.min.css';
 import { usePoiStore } from '@/stores/poiStore';
 import * as d3 from 'd3';
 import cloud from 'd3-cloud';
@@ -99,9 +107,103 @@ let graph = null;
 let currentRoot = null;
 let currentCityOrder = null;
 let currentLayoutType = null;
+let secondIntroStarted = false;
 
 // loading 遮罩状态
 const cloudLoading = computed(() => poiStore.cloudLoading);
+
+const getDrawLineButtonElement = () => {
+  return (
+    document.querySelector('[data-intro-target="drawLineTrigger"]') ||
+    document.querySelector('.map-head .dropdown-btn')
+  );
+};
+
+const getMapCanvasElement = () => {
+  return (
+    document.querySelector('[data-intro-target="mapCanvas"]') ||
+    document.querySelector('.map-canvas') ||
+    document.querySelector('.map-wrapper')
+  );
+};
+
+const getRunTagCloudButtonElement = () => {
+  return (
+    document.querySelector('[data-intro-target="runTagCloudBtn"]') ||
+    document.querySelector('.tagcloud-panel .panel-head .el-button--primary')
+  );
+};
+
+const startDrawGuideIntro = () => {
+  if (secondIntroStarted) return;
+  secondIntroStarted = true;
+
+  const attemptStart = (retries = 8) => {
+    const drawBtn = getDrawLineButtonElement();
+    const mapCanvas = getMapCanvasElement();
+    const runBtn = getRunTagCloudButtonElement();
+
+    if (drawBtn && mapCanvas && runBtn) {
+      try {
+        const intro = introJs.tour();
+        intro.addSteps([
+          {
+            element: drawBtn,
+            intro:
+              '<div style="line-height:1.6;"><strong style="font-size:16px;color:#1f2333;">绘制折线</strong><br/><span style="color:#64748b;">点击此处选择“手绘折线”或“自定义始末点”，划定需要分析的路线。</span></div>',
+          },
+          {
+            element: mapCanvas,
+            intro:
+              '<div style="line-height:1.6;"><strong style="font-size:16px;color:#1f2333;">地图区域</strong><br/><span style="color:#64748b;">在地图上完成折线绘制，系统会根据路线经过的城市准备标签数据。</span></div>',
+          },
+          {
+            element: runBtn,
+            intro:
+              '<div style="line-height:1.6;"><strong style="font-size:16px;color:#1f2333;">运行生成标签云</strong><br/><span style="color:#64748b;">绘制完成后，再次点击该按钮即可生成路线对应的标签云。</span></div>',
+          },
+        ]);
+        intro.setOptions({
+          nextLabel: '下一步 →',
+          prevLabel: '← 上一步',
+          skipLabel: '跳过',
+          doneLabel: '完成',
+          showStepNumbers: true,
+          showProgress: true,
+          disableInteraction: false,
+          tooltipClass: 'customTooltipClass',
+          highlightClass: 'customHighlightClass',
+          exitOnOverlayClick: true,
+          exitOnEsc: true,
+          keyboardNavigation: true,
+          tooltipRenderAsHtml: true,
+        });
+        intro.onComplete(() => {
+          secondIntroStarted = false;
+        });
+        intro.onExit(() => {
+          secondIntroStarted = false;
+        });
+        intro.start();
+      } catch (error) {
+        console.error('[TagCloudCanvas] 二次引导启动失败', error);
+        secondIntroStarted = false;
+      }
+      return;
+    }
+
+    if (retries > 0) {
+      setTimeout(() => attemptStart(retries - 1), 200);
+    } else {
+      console.warn('[TagCloudCanvas] 未找到绘制引导元素');
+      secondIntroStarted = false;
+    }
+  };
+
+  nextTick(() => {
+    setTimeout(() => attemptStart(), 120);
+  });
+};
 
 // 优化动态分配字号——对数插值算法
 function updateFontSizesForCompiledData(compiledData, fontSettings) {
@@ -495,6 +597,11 @@ const drawAllWordClouds = async (svg, data, cityOrder, width, height, lineType) 
 };
 
 const handleRenderCloud = async () => {
+  if (!poiStore.hasDrawing) {
+    startDrawGuideIntro();
+    return;
+  }
+
   poiStore.setCloudLoading(true);
   // 确保 DOM 更新，让 loading overlay 显示
   await nextTick();
@@ -512,10 +619,6 @@ const handleRenderCloud = async () => {
       cityOrderCount: poiStore.cityOrder.length,
       compiledKeys: Object.keys(poiStore.compiledData || {}).length,
     });
-    if (!poiStore.hasDrawing) {
-      console.warn('请先在地图上绘制折线');
-      return;
-    }
     // 检查数据是否已准备好
     if (!poiStore.cityOrder.length || !Object.keys(poiStore.compiledData).length) {
       console.warn('数据未准备好，请等待数据处理完成', {

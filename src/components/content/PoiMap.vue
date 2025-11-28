@@ -5,7 +5,10 @@
         trigger="click" 
         @command="handleDrawCommand"
       >
-        <span class="el-dropdown-link dropdown-btn">
+        <span
+          class="el-dropdown-link dropdown-btn"
+          data-intro-target="drawLineTrigger"
+        >
           绘制折线
           <el-icon><ArrowDown /></el-icon>
         </span>
@@ -39,7 +42,11 @@
       </el-dropdown>
       <el-button text @click="openSearch = true">检索定位</el-button>
     </header>
-    <div ref="mapRef" class="map-canvas"></div>
+    <div
+      ref="mapRef"
+      class="map-canvas"
+      data-intro-target="mapCanvas"
+    ></div>
     <el-dialog v-model="openSearch" title="搜索位置、公交站、地铁站" width="360px">
       <el-input v-model="searchKeyword" placeholder="请输入关键词" @keyup.enter="searchPlace">
         <template #append>
