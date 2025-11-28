@@ -9,12 +9,24 @@
       <div class="section-content">
         <div class="fontsize-row">
           <span class="fontsize-label">最小字号：</span>
-          <el-input-number v-model="localSettings.minFontSize" :min="2" :max="120" :step="2" @change="() => poiStore.updateFontLevel({ minFontSize: localSettings.minFontSize })" />
+          <el-input-number 
+            v-model="localSettings.minFontSize" 
+            :min="2" 
+            :max="localSettings.maxFontSize" 
+            :step="2" 
+            @change="handleMinFontSizeChange" 
+          />
           <span class="fontsize-unit">px</span>
         </div>
         <div class="fontsize-row">
           <span class="fontsize-label">最大字号：</span>
-          <el-input-number v-model="localSettings.maxFontSize" :min="2" :max="120" :step="2" @change="() => poiStore.updateFontLevel({ maxFontSize: localSettings.maxFontSize })" />
+          <el-input-number 
+            v-model="localSettings.maxFontSize" 
+            :min="localSettings.minFontSize" 
+            :max="120" 
+            :step="2" 
+            @change="handleMaxFontSizeChange" 
+          />
           <span class="fontsize-unit">px</span>
         </div>
       </div>
@@ -130,12 +142,29 @@ const fontGroups = [
 ];
 
 function handleWeightChange() {
-  poiStore.setCloudLoading(true);
   poiStore.updateFontLevel({ fontWeight: localSettings.fontWeight });
+  // 只有在已绘制路线的情况下才触发重绘（TagCloudCanvas.vue 中的 watch 会自动处理）
 }
+
 function handleFamilyChange(font) {
-  poiStore.setCloudLoading(true);
   poiStore.updateFontLevel({ fontFamily: font });
+  // 只有在已绘制路线的情况下才触发重绘（TagCloudCanvas.vue 中的 watch 会自动处理）
+}
+
+function handleMinFontSizeChange() {
+  // 如果最小字号超过最大字号，自动将其设置为最大字号
+  if (localSettings.minFontSize > localSettings.maxFontSize) {
+    localSettings.minFontSize = localSettings.maxFontSize;
+  }
+  poiStore.updateFontLevel({ minFontSize: localSettings.minFontSize });
+}
+
+function handleMaxFontSizeChange() {
+  // 如果最大字号小于最小字号，自动将其设置为最小字号
+  if (localSettings.maxFontSize < localSettings.minFontSize) {
+    localSettings.maxFontSize = localSettings.minFontSize;
+  }
+  poiStore.updateFontLevel({ maxFontSize: localSettings.maxFontSize });
 }
 </script>
 

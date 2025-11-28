@@ -16,7 +16,7 @@
     <div class="config-section">
       <div class="section-header">
         <span class="section-title">线条样式</span>
-        <span class="section-desc">调整线宽和颜色（形态为“无”时不可操作）</span>
+        <span class="section-desc">调整线宽（形态为"无"时不可操作）</span>
       </div>
       <div class="section-content">
         <el-form label-position="left" label-width="60px">
@@ -36,7 +36,7 @@
               v-model="lineColor"
               :disabled="lineType==='none'"
               @change="updateLineColor"
-              show-alpha
+              @active-change="updateLineColor"
             />
           </el-form-item>
         </el-form>
@@ -47,6 +47,7 @@
 <script setup>
 import { ref, watch } from 'vue';
 import { usePoiStore } from '@/stores/poiStore';
+import { ElColorPicker } from 'element-plus';
 const poiStore = usePoiStore();
 
 const lineType = ref(poiStore.linePanel?.type || 'curve');
@@ -55,13 +56,14 @@ const lineColor = ref(poiStore.linePanel?.color || '#aaa');
 
 function updateLineType(val) {
   poiStore.setLinePanel({ type: val, width: lineWidth.value, color: lineColor.value });
-  poiStore.lineType = val; // 如果旧代码路径需要
 }
 function updateLineWidth(val) {
   poiStore.setLinePanel({ type: lineType.value, width: val, color: lineColor.value });
 }
 function updateLineColor(val) {
-  poiStore.setLinePanel({ type: lineType.value, width: lineWidth.value, color: val });
+  if (val) {
+    poiStore.setLinePanel({ type: lineType.value, width: lineWidth.value, color: val });
+  }
 }
 
 // 保持和store同步

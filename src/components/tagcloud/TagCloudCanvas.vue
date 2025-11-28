@@ -1,13 +1,52 @@
 <template>
   <aside class="tagcloud-panel">
     <header class="panel-head">
-      <el-button type="primary" @click="handleRenderCloud">运行生成标签云</el-button>
+      <el-space direction="horizontal" alignment="center" size="small">
+        <el-button
+          type="primary"
+          data-intro-target="runTagCloudBtn"
+          @click="handleRenderCloud"
+        >
+          运行生成标签云
+        </el-button>
+        <el-dropdown @command="handleExportCommand">
+          <el-button>
+            导出图片<el-icon style="margin-left:4px"><arrow-down /></el-icon>
+          </el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="svg">导出SVG</el-dropdown-item>
+              <el-dropdown-item command="png">导出PNG</el-dropdown-item>
+              <el-dropdown-item command="jpeg">导出JPEG</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <span style="margin-left: 8px; font-size: 15px;">当前展示的城市数：{{ poiStore.cityOrder.length }}</span>
+      </el-space>
     </header>
+    <!-- 导出图片设置对话框 -->
+    <el-dialog v-model="exportDialogVisible" title="导出图片设置" width="350px" :close-on-click-modal="false">
+      <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px;">
+        <span style="width:60px;">宽度(px)</span>
+        <el-input-number v-model="exportWidth" :min="1" :max="4000" :step="10" size="small" @change="onExportWidthChange" style="width:130px;"/>
+      </div>
+      <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px;">
+        <span style="width:60px;">高度(px)</span>
+        <el-input-number v-model="exportHeight" :min="1" :max="4000" :step="10" size="small" @change="onExportHeightChange" style="width:130px;"/>
+      </div>
+      <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px;">
+        <el-checkbox v-model="lockAspectRatio" size="small">锁定比例</el-checkbox>
+      </div>
+      <template #footer>
+        <el-button @click="exportDialogVisible=false">取消</el-button>
+        <el-button type="primary" @click="handleExportConfirm">确认导出</el-button>
+      </template>
+    </el-dialog>
     <div class="canvas-wrapper" ref="wrapperRef">
       <svg ref="svgRef"
            :style="{ background: poiStore.colorSettings.background }"
       ></svg>
-      <div v-if="!poiStore.hasDrawing || !poiStore.cityOrder.length" class="empty-cloud-hint">
+      <div v-if="(!poiStore.hasDrawing || !poiStore.cityOrder.length) && !cloudLoading" class="empty-cloud-hint">
         <div class="hint-content">
           <div class="hint-icon">
             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -23,8 +62,17 @@
         </div>
       </div>
       <div v-if="cloudLoading" class="cloud-loading-overlay">
-        <span class="cloud-loading-icon">⏳</span>
-        <span class="cloud-loading-text">标签云生成中...</span>
+        <div class="cloud-loading-spinner">
+          <div class="spinner-dot"></div>
+          <div class="spinner-dot"></div>
+          <div class="spinner-dot"></div>
+          <div class="spinner-dot"></div>
+          <div class="spinner-dot"></div>
+          <div class="spinner-dot"></div>
+          <div class="spinner-dot"></div>
+          <div class="spinner-dot"></div>
+        </div>
+        <span class="cloud-loading-text">请稍等，正在生成标签云...</span>
       </div>
     </div>
   </aside>
@@ -32,19 +80,130 @@
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount, nextTick, watch, computed } from 'vue';
+import introJs from 'intro.js';
+import 'intro.js/minified/introjs.min.css';
 import { usePoiStore } from '@/stores/poiStore';
 import * as d3 from 'd3';
 import cloud from 'd3-cloud';
 import { StripLayout, SpiralLayout, PivotLayout } from '@/utils/treemapLayouts';
+import { ElButton, ElSpace, ElDropdown, ElDropdownMenu, ElDropdownItem, ElIcon, ElInputNumber, ElDialog, ElColorPicker, ElCheckbox } from 'element-plus';
+import { ArrowDown } from '@element-plus/icons-vue';
+
+const exportDialogVisible = ref(false)
+const exportWidth = ref(800)
+const exportHeight = ref(600)
+const exportFormat = ref('png')
+const lockAspectRatio = ref(true);
+const origWidth = ref(800);
+const origHeight = ref(600);
+let _aspectRatio = 1;
 
 const poiStore = usePoiStore();
 const wrapperRef = ref(null);
 const svgRef = ref(null);
 let svg = null;
 let graph = null;
+// 保存当前的布局信息，用于只更新路径
+let currentRoot = null;
+let currentCityOrder = null;
+let currentLayoutType = null;
+let secondIntroStarted = false;
 
 // loading 遮罩状态
 const cloudLoading = computed(() => poiStore.cloudLoading);
+
+const getDrawLineButtonElement = () => {
+  return (
+    document.querySelector('[data-intro-target="drawLineTrigger"]') ||
+    document.querySelector('.map-head .dropdown-btn')
+  );
+};
+
+const getMapCanvasElement = () => {
+  return (
+    document.querySelector('[data-intro-target="mapCanvas"]') ||
+    document.querySelector('.map-canvas') ||
+    document.querySelector('.map-wrapper')
+  );
+};
+
+const getRunTagCloudButtonElement = () => {
+  return (
+    document.querySelector('[data-intro-target="runTagCloudBtn"]') ||
+    document.querySelector('.tagcloud-panel .panel-head .el-button--primary')
+  );
+};
+
+const startDrawGuideIntro = () => {
+  if (secondIntroStarted) return;
+  secondIntroStarted = true;
+
+  const attemptStart = (retries = 8) => {
+    const drawBtn = getDrawLineButtonElement();
+    const mapCanvas = getMapCanvasElement();
+    const runBtn = getRunTagCloudButtonElement();
+
+    if (drawBtn && mapCanvas && runBtn) {
+      try {
+        const intro = introJs.tour();
+        intro.addSteps([
+          {
+            element: drawBtn,
+            intro:
+              '<div style="line-height:1.6;"><strong style="font-size:16px;color:#1f2333;">绘制折线</strong><br/><span style="color:#64748b;">点击此处选择“手绘折线”或“自定义始末点”，划定需要分析的路线。</span></div>',
+          },
+          {
+            element: mapCanvas,
+            intro:
+              '<div style="line-height:1.6;"><strong style="font-size:16px;color:#1f2333;">地图区域</strong><br/><span style="color:#64748b;">在地图上完成折线绘制，系统会根据路线经过的城市准备标签数据。</span></div>',
+          },
+          {
+            element: runBtn,
+            intro:
+              '<div style="line-height:1.6;"><strong style="font-size:16px;color:#1f2333;">运行生成标签云</strong><br/><span style="color:#64748b;">绘制完成后，再次点击该按钮即可生成路线对应的标签云。</span></div>',
+          },
+        ]);
+        intro.setOptions({
+          nextLabel: '下一步 →',
+          prevLabel: '← 上一步',
+          skipLabel: '跳过',
+          doneLabel: '完成',
+          showStepNumbers: true,
+          showProgress: true,
+          disableInteraction: false,
+          tooltipClass: 'customTooltipClass',
+          highlightClass: 'customHighlightClass',
+          exitOnOverlayClick: true,
+          exitOnEsc: true,
+          keyboardNavigation: true,
+          tooltipRenderAsHtml: true,
+        });
+        intro.onComplete(() => {
+          secondIntroStarted = false;
+        });
+        intro.onExit(() => {
+          secondIntroStarted = false;
+        });
+        intro.start();
+      } catch (error) {
+        console.error('[TagCloudCanvas] 二次引导启动失败', error);
+        secondIntroStarted = false;
+      }
+      return;
+    }
+
+    if (retries > 0) {
+      setTimeout(() => attemptStart(retries - 1), 200);
+    } else {
+      console.warn('[TagCloudCanvas] 未找到绘制引导元素');
+      secondIntroStarted = false;
+    }
+  };
+
+  nextTick(() => {
+    setTimeout(() => attemptStart(), 120);
+  });
+};
 
 // 优化动态分配字号——对数插值算法
 function updateFontSizesForCompiledData(compiledData, fontSettings) {
@@ -227,7 +386,11 @@ const drawSVGLine = (svg, root, cityOrder, lineOpts = {}) => {
     .map(city => recpoints.find(point => point.city === city))
     .filter(point => point && isFinite(point.x) && isFinite(point.y));
   if (orderedPoints.length < 2) return;
-  if(lineType==='none') return;
+  if(lineType==='none') {
+    // 如果类型为none，删除已存在的路径
+    svg.select("#city-route-path").remove();
+    return;
+  }
 
   let lineGen = d3.line()
     .x(d => d.x)
@@ -237,12 +400,86 @@ const drawSVGLine = (svg, root, cityOrder, lineOpts = {}) => {
   } else if(lineType === 'polyline') {
     lineGen.curve(d3.curveLinear);
   }
-  svg.append("path")
+  
+  // 先删除已存在的路径（如果存在）
+  svg.select("#city-route-path").remove();
+  
+  // 创建新路径，添加特定ID以便后续更新
+  // 确保路径在 SVG 的最前面（作为第一个子元素），这样词云会覆盖在路径上方
+  const svgNode = svg.node();
+  const firstChild = svgNode?.firstChild;
+  
+  // 使用 insert 方法，将路径插入到第一个元素之前（如果存在），否则插入到最前面
+  const path = svg.insert("path", firstChild ? () => firstChild : null)
+    .attr("id", "city-route-path")
     .datum(orderedPoints)
     .attr("fill", "none")
     .attr("stroke", color)
     .attr("stroke-width", width)
     .attr("d", lineGen);
+  
+  // 双重保险：确保路径是第一个子元素
+  const pathNode = path.node();
+  if (svgNode && pathNode && svgNode.firstChild !== pathNode) {
+    svgNode.insertBefore(pathNode, svgNode.firstChild);
+  }
+};
+
+// 只更新路径样式，不重新绘制整个标签云
+const updatePathOnly = () => {
+  if (!svg || !currentRoot || !currentCityOrder) return;
+  
+  const lineOpts = {
+    lineType: poiStore.linePanel?.type || 'curve',
+    width: poiStore.linePanel?.width || 2,
+    color: poiStore.linePanel?.color || '#aaa'
+  };
+  
+  drawSVGLine(svg, currentRoot, currentCityOrder, lineOpts);
+};
+
+// 只更新字体样式，不重新绘制整个标签云
+const updateFontStylesOnly = () => {
+  if (!svg) return;
+  
+  const fontFamily = poiStore.fontSettings.fontFamily || "Arial";
+  const fontWeight = poiStore.fontSettings.fontWeight || "700";
+  
+  // 更新所有文本元素的字体样式
+  svg.selectAll("text.word, text.city-label")
+    .style("font-family", fontFamily)
+    .style("font-weight", fontWeight);
+};
+
+// 只更新颜色，不重新绘制整个标签云
+const updateColorsOnly = () => {
+  if (!svg) return;
+  
+  // 遍历所有词云 group，根据 colorIndex 更新颜色
+  svg.selectAll("g[data-colorindex]").each(function() {
+    const g = d3.select(this);
+    const colorIndexAttr = g.attr("data-colorindex");
+    const colorIndex = parseInt(colorIndexAttr);
+    
+    // 如果 colorIndex 无效，跳过
+    if (isNaN(colorIndex) || colorIndex < 0) {
+      // 城市标签保持红色（colorIndex 为 -1 的情况）
+      g.selectAll("text.city-label")
+        .style("fill", "red");
+      return;
+    }
+    
+    // 获取新的颜色
+    const newColor = poiStore.Colors[colorIndex % poiStore.Colors.length];
+    
+    // 更新该 group 下所有非城市标签的文本颜色
+    g.selectAll("text.word")
+      .style("fill", newColor);
+    
+    // 城市标签保持红色
+    g.selectAll("text.city-label")
+      .style("fill", "red");
+  });
 };
 
 // 绘制单个词云
@@ -282,7 +519,7 @@ const drawWordCloud = (i, svg, cities, city, x, y, colorIndex, color, width, hei
 };
 
 // 绘制所有的词云
-const drawAllWordClouds = (svg, data, cityOrder, width, height, lineType) => {
+const drawAllWordClouds = async (svg, data, cityOrder, width, height, lineType) => {
   const cityData = calculateAttractionWeights(data, cityOrder);
   
   // 构建层次结构 - 原项目使用values作为children
@@ -301,8 +538,19 @@ const drawAllWordClouds = (svg, data, cityOrder, width, height, lineType) => {
   treemap(root);
 
   const leaves = root.leaves();
+  
+  // 将耗时计算分批进行，让浏览器有机会渲染动画
+  // 使用 setTimeout 让浏览器在计算间隙渲染
+  await new Promise(resolve => setTimeout(resolve, 0));
   graph = buildAdjacencyMatrix(leaves);
+  
+  await new Promise(resolve => setTimeout(resolve, 0));
   const colorindexs = graphColoring(graph, poiStore.colorNum);
+
+  // 保存当前布局信息，用于后续只更新路径
+  currentRoot = root;
+  currentCityOrder = cityOrder;
+  currentLayoutType = lineType;
 
   drawSVGLine(svg, root, cityOrder, {
     lineType: poiStore.linePanel?.type,
@@ -343,23 +591,34 @@ const drawAllWordClouds = (svg, data, cityOrder, width, height, lineType) => {
     cloudPromises.push(promise);
   });
 
-  Promise.all(cloudPromises).then(() => {
+  return Promise.all(cloudPromises).then(() => {
     console.log('所有词云绘制完成');
   });
 };
 
 const handleRenderCloud = async () => {
+  if (!poiStore.hasDrawing) {
+    startDrawGuideIntro();
+    return;
+  }
+
   poiStore.setCloudLoading(true);
+  // 确保 DOM 更新，让 loading overlay 显示
+  await nextTick();
+  // 使用 requestAnimationFrame 确保浏览器至少渲染一次 loading overlay
+  await new Promise(resolve => requestAnimationFrame(resolve));
+  // 再等待一帧，确保 loading overlay 完全渲染
+  await new Promise(resolve => requestAnimationFrame(resolve));
+  
+  const startTime = Date.now();
+  const minDisplayTime = 10; // 最小显示时间 300ms，确保用户能看到 loading
+  
   try {
     console.info('[TagCloudCanvas] handleRenderCloud 开始', {
       hasDrawing: poiStore.hasDrawing,
       cityOrderCount: poiStore.cityOrder.length,
       compiledKeys: Object.keys(poiStore.compiledData || {}).length,
     });
-    if (!poiStore.hasDrawing) {
-      console.warn('请先在地图上绘制折线');
-      return;
-    }
     // 检查数据是否已准备好
     if (!poiStore.cityOrder.length || !Object.keys(poiStore.compiledData).length) {
       console.warn('数据未准备好，请等待数据处理完成', {
@@ -376,20 +635,87 @@ const handleRenderCloud = async () => {
     svg = d3.select(svgRef.value);
     svg.selectAll("*").remove();
     svg.attr("width", width).attr("height", height);
+    // 清空保存的布局信息
+    currentRoot = null;
+    currentCityOrder = null;
+    currentLayoutType = null;
     const data = poiStore.compiledData;
     const cityOrder = poiStore.cityOrder;
     const lineType = poiStore.lineType || 'Pivot';
     // 字号分配
     updateFontSizesForCompiledData(data, poiStore.fontSettings);
     await nextTick();
-    drawAllWordClouds(svg, data, cityOrder, width, height, lineType);
+    // 再次让浏览器渲染一次，确保 loading overlay 可见
+    await new Promise(resolve => setTimeout(resolve, 50));
+    // 等待所有词云绘制完成后再关闭 loading
+    await drawAllWordClouds(svg, data, cityOrder, width, height, lineType);
   } finally {
+    // 确保 loading 至少显示最小时间
+    const elapsed = Date.now() - startTime;
+    if (elapsed < minDisplayTime) {
+      await new Promise(resolve => setTimeout(resolve, minDisplayTime - elapsed));
+    }
     poiStore.setCloudLoading(false);
   }
 };
 
-// 导出图片
-const exportAsImage = () => {
+const handleExportCommand = (command) => {
+  if(command === 'svg') {
+    exportAsSVG();
+  } else if(command === 'png' || command==='jpeg') {
+    prepareExportDialog(command)
+  }
+};
+
+function prepareExportDialog(format) {
+  exportFormat.value = format;
+  // 尺寸默认用svg实际宽高
+  if(svgRef.value) {
+    const svg = svgRef.value;
+    const rect = svg.getBBox();
+    const w = Math.round(rect.width || svg.width?.baseVal?.value || 800);
+    const h = Math.round(rect.height || svg.height?.baseVal?.value || 600);
+    exportWidth.value = w;
+    exportHeight.value = h;
+    origWidth.value = w;
+    origHeight.value = h;
+    _aspectRatio = w/h;
+  } else {
+    exportWidth.value = 800;
+    exportHeight.value = 600;
+    origWidth.value = 800;
+    origHeight.value = 600;
+    _aspectRatio = 800 / 600;
+  }
+  lockAspectRatio.value = true;
+  exportDialogVisible.value = true;
+}
+
+// 响应宽度、锁定比例
+function onExportWidthChange(val) {
+  if (lockAspectRatio.value && origWidth.value && origHeight.value) {
+    const w = Number(val)||1;
+    exportHeight.value = Math.round(w/origWidth.value*origHeight.value);
+  }
+}
+function onExportHeightChange(val) {
+  if (lockAspectRatio.value && origWidth.value && origHeight.value) {
+    const h = Number(val)||1;
+    exportWidth.value = Math.round(h/origHeight.value*origWidth.value);
+  }
+}
+
+const handleExportConfirm = () => {
+  exportDialogVisible.value = false;
+  exportAsRaster(
+    exportFormat.value,
+    exportWidth.value,
+    exportHeight.value,
+    '#ffffff' // 始终使用默认白底
+  );
+}
+
+const exportAsSVG = () => {
   if (!svgRef.value) return;
   const svgElement = svgRef.value;
   const svgString = new XMLSerializer().serializeToString(svgElement);
@@ -402,6 +728,40 @@ const exportAsImage = () => {
   URL.revokeObjectURL(url);
 };
 
+// SVG转图片格式加强，支持尺寸和背景色
+const exportAsRaster = async (format = 'png', exportWidth=800, exportHeight=600, bgColor='#ffffff') => {
+  if (!svgRef.value) return;
+  const svgElement = svgRef.value;
+  const serializer = new XMLSerializer();
+  let svgString = serializer.serializeToString(svgElement);
+  if(!svgString.match(/xmlns="http:\/\/www.w3.org\/2000\/svg"/)){
+    svgString = svgString.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+  }
+  const svg64 = btoa(unescape(encodeURIComponent(svgString)));
+  const imageSrc = `data:image/svg+xml;base64,${svg64}`;
+  const img = new window.Image();
+  img.onload = function() {
+    const canvas = document.createElement('canvas');
+    canvas.width = exportWidth;
+    canvas.height = exportHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.save();
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const type = format === 'jpeg' ? 'image/jpeg' : 'image/png';
+    const link = document.createElement('a');
+    link.href = canvas.toDataURL(type);
+    link.download = `tag-cloud-treemap.${format}`;
+    link.click();
+  };
+  img.onerror = () => {
+    alert('图片导出失败，请重试！');
+  };
+  img.src = imageSrc;
+};
+
 onMounted(() => {
   // 初始化SVG
   if (svgRef.value && wrapperRef.value) {
@@ -409,9 +769,13 @@ onMounted(() => {
     svg = d3.select(svgRef.value);
     svg.attr("width", rect.width).attr("height", rect.height);
   }
-  // 新增：监听配色变化事件
+  // 新增：监听配色变化事件 - 只更新颜色，不重绘整个标签云
   window.__refreshTagCloudListener__ = () => {
-    if (poiStore.hasDrawing) {
+    if (poiStore.hasDrawing && svg) {
+      // 如果已经有绘制好的标签云，只更新颜色
+      updateColorsOnly();
+    } else if (poiStore.hasDrawing) {
+      // 如果还没有绘制，需要完整渲染
       handleRenderCloud();
     }
   };
@@ -428,6 +792,10 @@ watch(
   (hasDrawing) => {
     if (!hasDrawing && svg) {
       svg.selectAll("*").remove();
+      // 清空保存的布局信息
+      currentRoot = null;
+      currentCityOrder = null;
+      currentLayoutType = null;
     }
   }
 );
@@ -446,22 +814,86 @@ watch(
   }
 );
 
-// watch字体设置深度变化，自动刷新并显示loading
+// watch字体设置深度变化 - 区分字号变化和字体样式变化
 watch(
   () => poiStore.fontSettings,
   (newVal, oldVal) => {
-    if (poiStore.hasDrawing) {
+    if (!oldVal) {
+      // 首次初始化，需要完整渲染
+      if (poiStore.hasDrawing) {
+        handleRenderCloud();
+      }
+      return;
+    }
+    
+    // 检查是否是字号变化（minFontSize 或 maxFontSize）
+    const isFontSizeChanged = 
+      newVal.minFontSize !== oldVal.minFontSize || 
+      newVal.maxFontSize !== oldVal.maxFontSize;
+    
+    // 检查是否是字体样式变化（fontFamily 或 fontWeight）
+    const isFontStyleChanged = 
+      newVal.fontFamily !== oldVal.fontFamily || 
+      newVal.fontWeight !== oldVal.fontWeight;
+    
+    if (isFontSizeChanged) {
+      // 字号变化需要重新计算字号分配和布局，需要完整重绘
+      if (poiStore.hasDrawing) {
+        handleRenderCloud();
+      }
+    } else if (isFontStyleChanged && poiStore.hasDrawing && svg) {
+      // 字体样式变化（字体、字重）只需要更新样式，不重绘
+      updateFontStylesOnly();
+    } else if (poiStore.hasDrawing) {
+      // 其他情况，需要完整渲染
       handleRenderCloud();
     }
   },
   { deep: true }
 );
 
-// setup标签云watch监听linePanel配置
+// watch布局类型变化，自动刷新并显示loading
+watch(
+  () => poiStore.lineType,
+  (newVal, oldVal) => {
+    if (poiStore.hasDrawing && oldVal !== undefined) {
+      handleRenderCloud();
+    }
+  }
+);
+
+// setup标签云watch监听linePanel配置 - 只更新路径，不重绘整个标签云
 watch(
   () => ({...poiStore.linePanel}),
   (val) => {
-    if (poiStore.hasDrawing) {
+    if (poiStore.hasDrawing && currentRoot && currentCityOrder) {
+      // 如果已经有绘制好的标签云，只更新路径元素
+      updatePathOnly();
+    } else if (poiStore.hasDrawing) {
+      // 如果还没有绘制，需要完整渲染
+      handleRenderCloud();
+    }
+  },
+  { deep: true }
+);
+
+// watch配色设置变化 - 只更新颜色，不重绘整个标签云
+watch(
+  () => ({...poiStore.colorSettings}),
+  (newVal, oldVal) => {
+    if (!oldVal) {
+      // 首次初始化，需要完整渲染
+      if (poiStore.hasDrawing) {
+        handleRenderCloud();
+      }
+      return;
+    }
+    
+    if (poiStore.hasDrawing && svg) {
+      // 如果已经有绘制好的标签云，只更新颜色
+      updateColorsOnly();
+    } else if (poiStore.hasDrawing) {
+      // 如果还没有绘制，需要完整渲染
       handleRenderCloud();
     }
   },
@@ -472,7 +904,7 @@ watch(
 <style scoped>
 .tagcloud-panel {
   background:rgb(247,249,252);
-  color: #fff;
+  color: #000000;
   padding: 24px;
   display: flex;
   flex-direction: column;
@@ -575,28 +1007,92 @@ svg {
 }
 .cloud-loading-overlay {
   position: absolute;
-  z-index: 99;
+  z-index: 999;
   top: 0; left: 0; width: 100%; height: 100%;
-  background: rgba(25, 30, 40, 0.72);
+  background: rgba(255, 255, 255, 0.85);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: #333;
   font-size: 20px;
   pointer-events: all;
   gap: 18px;
-  font-weight: bold;
-  backdrop-filter: blur(2px);
+  font-weight: 500;
+  backdrop-filter: blur(8px);
 }
-.cloud-loading-icon {
-  font-size: 44px;
+
+.cloud-loading-spinner {
+  position: relative;
+  width: 60px;
+  height: 60px;
   margin-bottom: 12px;
-  animation: cloud-spin 1s linear infinite;
+  will-change: transform;
 }
-@keyframes cloud-spin {
-  to {transform: rotate(1turn);}
+
+.spinner-dot {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #409eff;
+  top: 0;
+  left: 50%;
+  transform-origin: 0 30px;
+  will-change: transform, opacity;
+  animation: spinner-rotate 1.2s linear infinite;
 }
-.cloud-loading-text {margin-top: 8px;}
+
+.spinner-dot:nth-child(1) {
+  animation-delay: 0s;
+  opacity: 1;
+}
+
+.spinner-dot:nth-child(2) {
+  animation-delay: 0.15s;
+  opacity: 0.875;
+}
+
+.spinner-dot:nth-child(3) {
+  animation-delay: 0.3s;
+  opacity: 0.75;
+}
+
+.spinner-dot:nth-child(4) {
+  animation-delay: 0.45s;
+  opacity: 0.625;
+}
+
+.spinner-dot:nth-child(5) {
+  animation-delay: 0.6s;
+  opacity: 0.5;
+}
+
+.spinner-dot:nth-child(6) {
+  animation-delay: 0.75s;
+  opacity: 0.375;
+}
+
+.spinner-dot:nth-child(7) {
+  animation-delay: 0.9s;
+  opacity: 0.25;
+}
+
+.spinner-dot:nth-child(8) {
+  animation-delay: 1.05s;
+  opacity: 0.125;
+}
+
+@keyframes spinner-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.cloud-loading-text {
+  margin-top: 8px;
+  color: #606266;
+  font-size: 16px;
+}
 </style>
 
