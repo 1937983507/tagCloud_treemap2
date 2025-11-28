@@ -1,7 +1,11 @@
 <template>
   <aside class="tagcloud-panel">
     <header class="panel-head">
-      <el-button type="primary" @click="handleRenderCloud">运行生成标签云</el-button>
+      <el-space direction="horizontal" alignment="center" size="small">
+        <el-button type="primary" @click="handleRenderCloud">运行生成标签云</el-button>
+        <el-button @click="exportAsImage">导出图片</el-button>
+        <span style="margin-left: 8px; font-size: 15px;">当前展示的城市数：{{ poiStore.cityOrder.length }}</span>
+      </el-space>
     </header>
     <div class="canvas-wrapper" ref="wrapperRef">
       <svg ref="svgRef"
@@ -36,6 +40,7 @@ import { usePoiStore } from '@/stores/poiStore';
 import * as d3 from 'd3';
 import cloud from 'd3-cloud';
 import { StripLayout, SpiralLayout, PivotLayout } from '@/utils/treemapLayouts';
+import { ElButton, ElSpace } from 'element-plus';
 
 const poiStore = usePoiStore();
 const wrapperRef = ref(null);
@@ -472,7 +477,7 @@ watch(
 <style scoped>
 .tagcloud-panel {
   background:rgb(247,249,252);
-  color: #fff;
+  color: #000000;
   padding: 24px;
   display: flex;
   flex-direction: column;
