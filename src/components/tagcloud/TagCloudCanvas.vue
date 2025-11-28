@@ -18,6 +18,24 @@
         <span style="margin-left: 8px; font-size: 15px;">当前展示的城市数：{{ poiStore.cityOrder.length }}</span>
       </el-space>
     </header>
+    <!-- 导出图片设置对话框 -->
+    <el-dialog v-model="exportDialogVisible" title="导出图片设置" width="350px" :close-on-click-modal="false">
+      <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px;">
+        <span style="width:60px;">宽度(px)</span>
+        <el-input-number v-model="exportWidth" :min="1" :max="4000" :step="10" size="small" @change="onExportWidthChange" style="width:130px;"/>
+      </div>
+      <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px;">
+        <span style="width:60px;">高度(px)</span>
+        <el-input-number v-model="exportHeight" :min="1" :max="4000" :step="10" size="small" @change="onExportHeightChange" style="width:130px;"/>
+      </div>
+      <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px;">
+        <el-checkbox v-model="lockAspectRatio" size="small">锁定比例</el-checkbox>
+      </div>
+      <template #footer>
+        <el-button @click="exportDialogVisible=false">取消</el-button>
+        <el-button type="primary" @click="handleExportConfirm">确认导出</el-button>
+      </template>
+    </el-dialog>
     <div class="canvas-wrapper" ref="wrapperRef">
       <svg ref="svgRef"
            :style="{ background: poiStore.colorSettings.background }"
@@ -51,8 +69,17 @@ import { usePoiStore } from '@/stores/poiStore';
 import * as d3 from 'd3';
 import cloud from 'd3-cloud';
 import { StripLayout, SpiralLayout, PivotLayout } from '@/utils/treemapLayouts';
-import { ElButton, ElSpace, ElDropdown, ElDropdownMenu, ElDropdownItem, ElIcon } from 'element-plus';
+import { ElButton, ElSpace, ElDropdown, ElDropdownMenu, ElDropdownItem, ElIcon, ElInputNumber, ElDialog, ElColorPicker, ElCheckbox } from 'element-plus';
 import { ArrowDown } from '@element-plus/icons-vue';
+
+const exportDialogVisible = ref(false)
+const exportWidth = ref(800)
+const exportHeight = ref(600)
+const exportFormat = ref('png')
+const lockAspectRatio = ref(true);
+const origWidth = ref(800);
+const origHeight = ref(600);
+let _aspectRatio = 1;
 
 const poiStore = usePoiStore();
 const wrapperRef = ref(null);
@@ -408,12 +435,59 @@ const handleRenderCloud = async () => {
 const handleExportCommand = (command) => {
   if(command === 'svg') {
     exportAsSVG();
-  } else if(command === 'png' || command === 'jpeg') {
-    exportAsRaster(command);
+  } else if(command === 'png' || command==='jpeg') {
+    prepareExportDialog(command)
   }
 };
 
-// 导出SVG
+function prepareExportDialog(format) {
+  exportFormat.value = format;
+  // 尺寸默认用svg实际宽高
+  if(svgRef.value) {
+    const svg = svgRef.value;
+    const rect = svg.getBBox();
+    const w = Math.round(rect.width || svg.width?.baseVal?.value || 800);
+    const h = Math.round(rect.height || svg.height?.baseVal?.value || 600);
+    exportWidth.value = w;
+    exportHeight.value = h;
+    origWidth.value = w;
+    origHeight.value = h;
+    _aspectRatio = w/h;
+  } else {
+    exportWidth.value = 800;
+    exportHeight.value = 600;
+    origWidth.value = 800;
+    origHeight.value = 600;
+    _aspectRatio = 800 / 600;
+  }
+  lockAspectRatio.value = true;
+  exportDialogVisible.value = true;
+}
+
+// 响应宽度、锁定比例
+function onExportWidthChange(val) {
+  if (lockAspectRatio.value && origWidth.value && origHeight.value) {
+    const w = Number(val)||1;
+    exportHeight.value = Math.round(w/origWidth.value*origHeight.value);
+  }
+}
+function onExportHeightChange(val) {
+  if (lockAspectRatio.value && origWidth.value && origHeight.value) {
+    const h = Number(val)||1;
+    exportWidth.value = Math.round(h/origHeight.value*origWidth.value);
+  }
+}
+
+const handleExportConfirm = () => {
+  exportDialogVisible.value = false;
+  exportAsRaster(
+    exportFormat.value,
+    exportWidth.value,
+    exportHeight.value,
+    '#ffffff' // 始终使用默认白底
+  );
+}
+
 const exportAsSVG = () => {
   if (!svgRef.value) return;
   const svgElement = svgRef.value;
@@ -427,18 +501,12 @@ const exportAsSVG = () => {
   URL.revokeObjectURL(url);
 };
 
-// SVG转图片格式
-const exportAsRaster = async (format = 'png') => {
+// SVG转图片格式加强，支持尺寸和背景色
+const exportAsRaster = async (format = 'png', exportWidth=800, exportHeight=600, bgColor='#ffffff') => {
   if (!svgRef.value) return;
   const svgElement = svgRef.value;
-  const rect = svgElement.getBBox();
-  const { width, height } = rect;
-  // fallback: svg节点没有内容时，取viewBox、容器宽高
-  const w = width || svgElement.viewBox?.baseVal?.width || svgElement.width?.baseVal?.value || 800;
-  const h = height || svgElement.viewBox?.baseVal?.height || svgElement.height?.baseVal?.value || 600;
   const serializer = new XMLSerializer();
   let svgString = serializer.serializeToString(svgElement);
-  // 补上 xmlns，防止部分浏览器导出无效
   if(!svgString.match(/xmlns="http:\/\/www.w3.org\/2000\/svg"/)){
     svgString = svgString.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
   }
@@ -447,11 +515,14 @@ const exportAsRaster = async (format = 'png') => {
   const img = new window.Image();
   img.onload = function() {
     const canvas = document.createElement('canvas');
-    canvas.width = w;
-    canvas.height = h;
+    canvas.width = exportWidth;
+    canvas.height = exportHeight;
     const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, w, h);
-    ctx.drawImage(img, 0, 0, w, h);
+    ctx.save();
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
     const type = format === 'jpeg' ? 'image/jpeg' : 'image/png';
     const link = document.createElement('a');
     link.href = canvas.toDataURL(type);
