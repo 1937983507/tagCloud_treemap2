@@ -96,8 +96,8 @@ const currentRibbon = computed(() => {
 });
 
 const availableRibbons = computed(() => {
-  const schemes = ribbonColorSchemes[1] || [];
-  return schemes.map(scheme => scheme.map(c => `rgb(${c.join(',')})`));
+  // 这里只留四色带方案
+  return ribbonColorSchemes.map(scheme => scheme.map(c => `rgb(${c.join(',')})`));
 });
 
 watch(
