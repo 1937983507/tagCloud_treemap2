@@ -13,12 +13,15 @@
       </button>
     </div>
     <div class="menu-group footer-group">
+      <button class="menu-item ghost" @click="handleShortcutClick">快捷键</button>
       <button class="menu-item ghost" @click="handleHelpClick">帮助</button>
+      <button class="menu-item ghost" @click="handleHideClick">隐藏</button>
     </div>
   </aside>
 </template>
 
 <script setup>
+import { ElMessage } from 'element-plus';
 import {
   BrushFilled,
   Collection,
@@ -44,8 +47,16 @@ const mainMenu = [
   { key: 'line', label: '线条', icon: Connection }, // 新增线条按钮 选用Connection图标
 ];
 
+const handleShortcutClick = () => {
+  ElMessage.info('该功能正在开发中，敬请期待！');
+};
+
 const handleHelpClick = () => {
   emit('navigate', 'help');
+};
+
+const handleHideClick = () => {
+  ElMessage.info('该功能正在开发中，敬请期待！');
 };
 </script>
 
