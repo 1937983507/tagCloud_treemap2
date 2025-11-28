@@ -3,7 +3,18 @@
     <header class="panel-head">
       <el-space direction="horizontal" alignment="center" size="small">
         <el-button type="primary" @click="handleRenderCloud">运行生成标签云</el-button>
-        <el-button @click="exportAsImage">导出图片</el-button>
+        <el-dropdown @command="handleExportCommand">
+          <el-button>
+            导出图片<el-icon style="margin-left:4px"><arrow-down /></el-icon>
+          </el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="svg">导出SVG</el-dropdown-item>
+              <el-dropdown-item command="png">导出PNG</el-dropdown-item>
+              <el-dropdown-item command="jpeg">导出JPEG</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
         <span style="margin-left: 8px; font-size: 15px;">当前展示的城市数：{{ poiStore.cityOrder.length }}</span>
       </el-space>
     </header>
@@ -40,7 +51,8 @@ import { usePoiStore } from '@/stores/poiStore';
 import * as d3 from 'd3';
 import cloud from 'd3-cloud';
 import { StripLayout, SpiralLayout, PivotLayout } from '@/utils/treemapLayouts';
-import { ElButton, ElSpace } from 'element-plus';
+import { ElButton, ElSpace, ElDropdown, ElDropdownMenu, ElDropdownItem, ElIcon } from 'element-plus';
+import { ArrowDown } from '@element-plus/icons-vue';
 
 const poiStore = usePoiStore();
 const wrapperRef = ref(null);
@@ -393,8 +405,16 @@ const handleRenderCloud = async () => {
   }
 };
 
-// 导出图片
-const exportAsImage = () => {
+const handleExportCommand = (command) => {
+  if(command === 'svg') {
+    exportAsSVG();
+  } else if(command === 'png' || command === 'jpeg') {
+    exportAsRaster(command);
+  }
+};
+
+// 导出SVG
+const exportAsSVG = () => {
   if (!svgRef.value) return;
   const svgElement = svgRef.value;
   const svgString = new XMLSerializer().serializeToString(svgElement);
@@ -405,6 +425,43 @@ const exportAsImage = () => {
   link.download = 'tag-cloud-treemap.svg';
   link.click();
   URL.revokeObjectURL(url);
+};
+
+// SVG转图片格式
+const exportAsRaster = async (format = 'png') => {
+  if (!svgRef.value) return;
+  const svgElement = svgRef.value;
+  const rect = svgElement.getBBox();
+  const { width, height } = rect;
+  // fallback: svg节点没有内容时，取viewBox、容器宽高
+  const w = width || svgElement.viewBox?.baseVal?.width || svgElement.width?.baseVal?.value || 800;
+  const h = height || svgElement.viewBox?.baseVal?.height || svgElement.height?.baseVal?.value || 600;
+  const serializer = new XMLSerializer();
+  let svgString = serializer.serializeToString(svgElement);
+  // 补上 xmlns，防止部分浏览器导出无效
+  if(!svgString.match(/xmlns="http:\/\/www.w3.org\/2000\/svg"/)){
+    svgString = svgString.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+  }
+  const svg64 = btoa(unescape(encodeURIComponent(svgString)));
+  const imageSrc = `data:image/svg+xml;base64,${svg64}`;
+  const img = new window.Image();
+  img.onload = function() {
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, w, h);
+    ctx.drawImage(img, 0, 0, w, h);
+    const type = format === 'jpeg' ? 'image/jpeg' : 'image/png';
+    const link = document.createElement('a');
+    link.href = canvas.toDataURL(type);
+    link.download = `tag-cloud-treemap.${format}`;
+    link.click();
+  };
+  img.onerror = () => {
+    alert('图片导出失败，请重试！');
+  };
+  img.src = imageSrc;
 };
 
 onMounted(() => {
