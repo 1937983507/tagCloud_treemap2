@@ -69,11 +69,11 @@ const handleHideClick = () => {
   justify-content: space-between;
   height: 100%;
   padding: 24px 8px 20px 8px;
-  background: linear-gradient(180deg, #0f1424 0%, #1a1e2e 100%);
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
+  border-right: 1px solid rgba(15, 20, 36, 0.08);
   min-height: 0;
   overflow: hidden;
-  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 2px 0 8px rgba(15, 20, 36, 0.06);
 }
 
 .menu-group {
@@ -91,7 +91,7 @@ const handleHideClick = () => {
   padding: 12px 10px;
   border-radius: 10px;
   background: transparent;
-  color: rgba(255, 255, 255, 0.7);
+  color: #1f2333;
   border: none;
   font-size: 14px;
   cursor: pointer;
@@ -110,14 +110,14 @@ const handleHideClick = () => {
   transform: translateY(-50%);
   width: 3px;
   height: 0;
-  background: linear-gradient(180deg, #399ceb, #57c6f1);
+  background: linear-gradient(180deg, #7dd3fc, #38bdf8);
   border-radius: 0 3px 3px 0;
   transition: height 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .menu-item:hover {
-  background: rgba(57, 156, 235, 0.1);
-  color: rgba(255, 255, 255, 0.9);
+  background: rgba(148, 163, 184, 0.2);
+  color: #0f172a;
   transform: translateX(2px);
 }
 
@@ -126,10 +126,10 @@ const handleHideClick = () => {
 }
 
 .menu-item.active {
-  background: linear-gradient(90deg, #399ceb, #57c6f1);
-  color: #fff;
+  background: linear-gradient(120deg, #dbeafe, #bfdbfe);
+  color: #0f172a;
   font-weight: 600;
-  box-shadow: 0 4px 12px rgba(57, 156, 235, 0.3);
+  box-shadow: 0 4px 12px rgba(148, 163, 184, 0.4);
 }
 
 .menu-item.active::before {
@@ -140,13 +140,13 @@ const handleHideClick = () => {
 .menu-item.ghost {
   justify-content: center;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(15, 23, 42, 0.6);
   padding: 8px;
 }
 
 .menu-item.ghost:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.7);
+  background: rgba(15, 23, 42, 0.05);
+  color: rgba(15, 23, 42, 0.9);
 }
 
 .footer-group {
