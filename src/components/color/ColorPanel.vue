@@ -44,8 +44,27 @@
               v-for="(color, index) in currentRibbon"
               :key="`ribbon-${index}`"
               class="ribbon-color-item"
-              :style="{ background: color }"
-            ></div>
+              style="display: flex; align-items: center; gap: 8px; padding: 4px;"
+            >
+              <el-color-picker
+                :model-value="localSettings.palette?.[index] || currentRibbon[index]"
+                @change="(val) => handleSingleColorChange(index, val)"
+                @active-change="(val) => handleSingleColorChange(index, val)"
+                size="small"
+                :predefine="[]"
+              />
+              <span
+                class="color-preview"
+                :style="{
+                  background: color || '#fff',
+                  height: '24px',
+                  display: 'block',
+                  borderRadius: '4px',
+                  flex: '1 1 auto',
+                  minWidth: '0'
+                }"
+              ></span>
+            </div>
           </div>
         </div>
 
@@ -100,10 +119,24 @@ const availableRibbons = computed(() => {
   return ribbonColorSchemes.map(scheme => scheme.map(c => `rgb(${c.join(',')})`));
 });
 
+// 标记是否正在更新，避免watch循环
+const isUpdating = ref(false);
+
 watch(
   () => poiStore.colorSettings,
   (settings) => {
-    localSettings.value = { ...settings };
+    // 如果正在更新，跳过watch，避免覆盖正在进行的修改
+    if (isUpdating.value) {
+      return;
+    }
+    
+    // 确保palette数组是新的引用，保持响应式
+    const newPalette = settings.palette ? [...settings.palette] : [];
+    localSettings.value = {
+      ...settings,
+      palette: newPalette
+    };
+    
     // 保持只允许四色带，但如果 palette 不是标准候选色带之一（如翻转后），允许索引为 -1
     nextTick(() => {
       if (availableRibbons.value.length > 0) {
@@ -159,6 +192,75 @@ const handleColorFlip = () => {
       }, 50);
     }
   }, 50);
+};
+
+// 将颜色值转换为rgb格式字符串
+function convertToRgbStr(color) {
+  if (!color) return 'rgb(0,0,0)';
+  // 如果已经是rgb格式，直接返回
+  if (color.startsWith('rgb')) return color;
+  // 如果是hex格式，转换为rgb
+  if (color.startsWith('#')) {
+    const hex = color.slice(1);
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
+    return `rgb(${r},${g},${b})`;
+  }
+  // 其他格式直接返回
+  return color;
+}
+
+// 处理单个颜色修改
+const handleSingleColorChange = (index, color) => {
+  if (color === null || color === undefined) return;
+  
+  // 设置更新标志，避免watch循环
+  isUpdating.value = true;
+  
+  try {
+    // 确保palette数组存在且长度为4
+    const currentPalette = localSettings.value.palette || [];
+    const palette = currentPalette.length > 0 ? [...currentPalette] : [];
+    while (palette.length < 4) {
+      palette.push('rgb(0,0,0)');
+    }
+    
+    // 转换颜色格式为rgb
+    const rgbStr = convertToRgbStr(color);
+    
+    // 创建新数组，确保响应式更新
+    const newPalette = [...palette];
+    newPalette[index] = rgbStr;
+    
+    // 直接更新localSettings，确保UI立即响应（使用新数组引用）
+    localSettings.value = {
+      ...localSettings.value,
+      palette: newPalette
+    };
+    
+    // 更新store
+    poiStore.updateColorSettings({
+      palette: newPalette,
+    });
+    
+    // 自定义颜色后，将索引设为-1，表示不是标准色带
+    currentRibbonIndex.value = -1;
+    
+    // 通知主视图区刷新标签云
+    if (poiStore.hasDrawing) {
+      setTimeout(() => {
+        if (window && window.dispatchEvent) {
+          window.dispatchEvent(new CustomEvent('refreshTagCloud'));
+        }
+      }, 50);
+    }
+  } finally {
+    // 延迟重置标志，确保watch不会立即覆盖
+    setTimeout(() => {
+      isUpdating.value = false;
+    }, 100);
+  }
 };
 
 const handleRibbonSchemeSelect = (index) => {
