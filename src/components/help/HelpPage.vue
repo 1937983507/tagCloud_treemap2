@@ -65,7 +65,7 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from 'vue';
 import { marked } from 'marked';
-import HELP_MD from '../../../HELP.md?raw';
+import HELP_MD from './HELP.md?raw';
 import FooterBar from '@/components/layout/FooterBar.vue';
 
 const emit = defineEmits(['navigate']);
@@ -306,10 +306,11 @@ const getSectionId = (title) => {
     '概述': 'introduction',
     '快速上手': 'getting-started',
     '入门教程': 'primer',
-    '常见问题': 'commonProblems',
-    '更新日志': 'updateLog',
-    '相关下载': 'relatedDownloads',
-    '视频专区': 'video',
+    '技术文档与参考资料': 'documents',
+    '视频教程专区': 'video',
+    '技术支持与社区': 'support',
+    '版本更新日志': 'version',
+    '附录':'appendix'
   };
   
   // 先尝试精确匹配
