@@ -190,11 +190,13 @@ const compileData = (selectedPOI) => {
   }
 
   selectedPOI.forEach(poi => {
-    const { pname, city, rankInChina } = poi;
+    const { pname, name_en, city, rankInChina } = poi;
     if (!data[city]) {
       data[city] = [];
     }
-    data[city].push({ text: pname, rankInChina });
+    // 根据语言设置选择使用中文名或英文名
+    const text = poiStore.fontSettings.language === 'en' && name_en ? name_en : pname;
+    data[city].push({ text: text, rankInChina });
   });
 
   return data;
@@ -584,6 +586,18 @@ watch(
     updateLayerByView();
   },
   { deep: true },
+);
+
+// 监听语言变化，自动重新编译数据
+watch(
+  () => poiStore.fontSettings.language,
+  async (newLanguage, oldLanguage) => {
+    // 只有在语言真正变化且已有绘制路线时才重新编译
+    if (oldLanguage !== undefined && newLanguage !== oldLanguage && poiStore.hasDrawing) {
+      console.info('[PoiMap] 语言变化，重新编译数据', { oldLanguage, newLanguage });
+      await getPOIMain();
+    }
+  },
 );
 
 onBeforeUnmount(() => {

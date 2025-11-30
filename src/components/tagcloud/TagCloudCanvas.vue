@@ -86,6 +86,7 @@ import { usePoiStore } from '@/stores/poiStore';
 import * as d3 from 'd3';
 import cloud from 'd3-cloud';
 import { StripLayout, SpiralLayout, PivotLayout } from '@/utils/treemapLayouts';
+import { cityNameToPinyin } from '@/utils/cityNameToPinyin';
 import { ElButton, ElSpace, ElDropdown, ElDropdownMenu, ElDropdownItem, ElIcon, ElInputNumber, ElDialog, ElColorPicker, ElCheckbox } from 'element-plus';
 import { ArrowDown } from '@element-plus/icons-vue';
 
@@ -487,7 +488,11 @@ const drawWordCloud = (i, svg, cities, city, x, y, colorIndex, color, width, hei
   if (!isFinite(x) || !isFinite(y)) { if(resolve)resolve(); return; }
   const words = cities[city] ? cities[city].map(d => ({ text: d.text, size: d.size, color: color })) : [];
   if (words.length == 0) { if (resolve) resolve(); return; }
-  words.push({ text: city, size: 46, isCity: true, colorIndex: -1 });
+  // 根据语言设置选择城市名：中文使用原城市名，英文使用拼音
+  const cityName = poiStore.fontSettings.language === 'en' 
+    ? cityNameToPinyin(city) 
+    : city;
+  words.push({ text: cityName, size: 46, isCity: true, colorIndex: -1 });
   const layout = cloud()
     .size([width, height])
     .words(words)
@@ -826,6 +831,9 @@ watch(
       return;
     }
     
+    // 检查是否是语言变化
+    const isLanguageChanged = newVal.language !== oldVal.language;
+    
     // 检查是否是字号变化（minFontSize 或 maxFontSize）
     const isFontSizeChanged = 
       newVal.minFontSize !== oldVal.minFontSize || 
@@ -836,7 +844,19 @@ watch(
       newVal.fontFamily !== oldVal.fontFamily || 
       newVal.fontWeight !== oldVal.fontWeight;
     
-    if (isFontSizeChanged) {
+    if (isLanguageChanged) {
+      // 语言变化需要重新编译数据并完整重绘
+      // PoiMap.vue 中的 watch 会自动重新编译数据
+      // 这里等待数据编译完成后再重绘
+      if (poiStore.hasDrawing) {
+        // 使用 nextTick 确保数据已经重新编译
+        nextTick(() => {
+          setTimeout(() => {
+            handleRenderCloud();
+          }, 100); // 给一点时间让数据编译完成
+        });
+      }
+    } else if (isFontSizeChanged) {
       // 字号变化需要重新计算字号分配和布局，需要完整重绘
       if (poiStore.hasDrawing) {
         handleRenderCloud();

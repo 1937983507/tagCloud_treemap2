@@ -1,5 +1,23 @@
 <template>
   <section class="panel-card typeface-panel">
+    <!-- 语言选择 -->
+    <div class="config-section">
+      <div class="section-header">
+        <span class="section-title">语言</span>
+        <span class="section-desc">选择标签显示的语言</span>
+      </div>
+      <div class="section-content">
+        <el-select
+          v-model="localSettings.language"
+          style="width: 200px"
+          @change="handleLanguageChange"
+        >
+          <el-option label="中文" value="zh" />
+          <el-option label="English" value="en" />
+        </el-select>
+      </div>
+    </div>
+
     <!-- 字号设置 -->
     <div class="config-section">
       <div class="section-header">
@@ -103,6 +121,7 @@ const poiStore = usePoiStore();
 const activeFontTab = ref('cn');
 
 const localSettings = reactive({
+  language: poiStore.fontSettings.language || 'zh',
   minFontSize: poiStore.fontSettings.minFontSize,
   maxFontSize: poiStore.fontSettings.maxFontSize,
   fontWeight: poiStore.fontSettings.fontWeight,
@@ -140,6 +159,11 @@ const fontGroups = [
     ],
   },
 ];
+
+function handleLanguageChange() {
+  poiStore.updateFontLevel({ language: localSettings.language });
+  // 语言变化需要重新编译数据并重绘（TagCloudCanvas.vue 中的 watch 会自动处理）
+}
 
 function handleWeightChange() {
   poiStore.updateFontLevel({ fontWeight: localSettings.fontWeight });
