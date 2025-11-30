@@ -7,7 +7,17 @@
         <span class="section-desc">设置标签云的背景颜色</span>
       </div>
       <div class="section-content">
+        <!-- 单色/复色选择 -->
         <div class="color-item">
+          <span class="label">配色模式：</span>
+          <el-radio-group v-model="localSettings.backgroundMode" @change="handleBackgroundModeChange">
+            <el-radio label="single">单色</el-radio>
+            <el-radio label="multi">复色</el-radio>
+          </el-radio-group>
+        </div>
+
+        <!-- 单色模式 -->
+        <div v-if="localSettings.backgroundMode === 'single'" class="color-item">
           <span class="label">当前背景颜色：</span>
           <el-color-picker
             v-model="localSettings.background"
@@ -16,6 +26,66 @@
             show-alpha
           />
           <span class="color-preview" :style="{ background: localSettings.background }"></span>
+        </div>
+
+        <!-- 复色模式 -->
+        <div v-if="localSettings.backgroundMode === 'multi'">
+          <!-- 当前色带展示 -->
+          <div class="ribbon-preview-section">
+            <div class="ribbon-header">
+              <span class="label">当前色带：</span>
+              <el-button 
+                size="small" 
+                @click="handleColorFlip"
+                :icon="Refresh"
+              >
+                颜色翻转
+              </el-button>
+            </div>
+            <div class="current-ribbon">
+              <div
+                v-for="(color, index) in currentRibbon"
+                :key="`ribbon-${index}`"
+                class="ribbon-color-item"
+                style="display: flex; align-items: center; gap: 8px; padding: 4px;"
+              >
+                <el-color-picker
+                  :model-value="localSettings.palette?.[index] || currentRibbon[index]"
+                  @change="(val) => handleSingleColorChange(index, val)"
+                  @active-change="(val) => handleSingleColorChange(index, val)"
+                  size="small"
+                  :predefine="[]"
+                />
+                <span
+                  class="color-preview"
+                  :style="{
+                    background: color || '#fff',
+                    height: '24px',
+                    display: 'block',
+                    borderRadius: '4px',
+                    flex: '1 1 auto',
+                    minWidth: '0'
+                  }"
+                ></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 透明度调节 -->
+          <div class="color-item">
+            <span class="label">透明度：</span>
+            <el-slider
+              v-model="backgroundOpacityValue"
+              :min="0"
+              :max="100"
+              :step="1"
+              @change="handleBackgroundOpacityChange"
+              style="flex: 1; margin: 0 12px;"
+            />
+            <span style="min-width: 50px; text-align: right; font-size: 12px; color: #606266;">
+              {{ backgroundOpacityValue }}%
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -27,48 +97,80 @@
         <span class="section-desc">设置标签文字的颜色方案</span>
       </div>
       <div class="section-content">
-        <!-- 当前色带展示 -->
-        <div class="ribbon-preview-section">
-          <div class="ribbon-header">
-            <span class="label">当前色带：</span>
-            <el-button 
-              size="small" 
-              @click="handleColorFlip"
-              :icon="Refresh"
-            >
-              颜色翻转
-            </el-button>
-          </div>
-          <div class="current-ribbon">
-            <div
-              v-for="(color, index) in currentRibbon"
-              :key="`ribbon-${index}`"
-              class="ribbon-color-item"
-              style="display: flex; align-items: center; gap: 8px; padding: 4px;"
-            >
-              <el-color-picker
-                :model-value="localSettings.palette?.[index] || currentRibbon[index]"
-                @change="(val) => handleSingleColorChange(index, val)"
-                @active-change="(val) => handleSingleColorChange(index, val)"
-                size="small"
-                :predefine="[]"
-              />
-              <span
-                class="color-preview"
-                :style="{
-                  background: color || '#fff',
-                  height: '24px',
-                  display: 'block',
-                  borderRadius: '4px',
-                  flex: '1 1 auto',
-                  minWidth: '0'
-                }"
-              ></span>
+        <!-- 单色/复色选择 -->
+        <div class="color-item">
+          <span class="label">配色模式：</span>
+          <el-radio-group v-model="localSettings.textColorMode" @change="handleTextColorModeChange">
+            <el-radio label="single">单色</el-radio>
+            <el-radio label="multi">复色</el-radio>
+          </el-radio-group>
+        </div>
+
+        <!-- 单色模式 -->
+        <div v-if="localSettings.textColorMode === 'single'" class="color-item">
+          <span class="label">当前文字颜色：</span>
+          <el-color-picker
+            v-model="localSettings.textSingleColor"
+            @change="handleTextSingleColorChange"
+            @active-change="handleTextSingleColorChange"
+            show-alpha
+          />
+          <span class="color-preview" :style="{ background: localSettings.textSingleColor }"></span>
+        </div>
+
+        <!-- 复色模式 -->
+        <div v-if="localSettings.textColorMode === 'multi'">
+          <!-- 当前色带展示 -->
+          <div class="ribbon-preview-section">
+            <div class="ribbon-header">
+              <span class="label">当前色带：</span>
+              <el-button 
+                size="small" 
+                @click="handleColorFlip"
+                :icon="Refresh"
+              >
+                颜色翻转
+              </el-button>
+            </div>
+            <div class="current-ribbon">
+              <div
+                v-for="(color, index) in currentRibbon"
+                :key="`ribbon-${index}`"
+                class="ribbon-color-item"
+                style="display: flex; align-items: center; gap: 8px; padding: 4px;"
+              >
+                <el-color-picker
+                  :model-value="localSettings.palette?.[index] || currentRibbon[index]"
+                  @change="(val) => handleSingleColorChange(index, val)"
+                  @active-change="(val) => handleSingleColorChange(index, val)"
+                  size="small"
+                  :predefine="[]"
+                />
+                <span
+                  class="color-preview"
+                  :style="{
+                    background: color || '#fff',
+                    height: '24px',
+                    display: 'block',
+                    borderRadius: '4px',
+                    flex: '1 1 auto',
+                    minWidth: '0'
+                  }"
+                ></span>
+              </div>
             </div>
           </div>
         </div>
+      </div>
+    </div>
 
-        <!-- 配色方案选择 -->
+    <!-- 配色方案 -->
+    <div class="config-section">
+      <div class="section-header">
+        <span class="section-title">配色方案</span>
+        <span class="section-desc">选择预设的配色方案</span>
+      </div>
+      <div class="section-content">
         <div class="scheme-selection">
           <div class="scheme-header">
             <span class="label">配色方案：</span>
@@ -103,6 +205,7 @@ import { ref, watch, computed, nextTick, onMounted } from 'vue';
 import { usePoiStore } from '@/stores/poiStore';
 import { Refresh } from '@element-plus/icons-vue';
 import { ribbonColorSchemes } from './ribbonColorSchemes';
+import { ElRadioGroup, ElRadio, ElSlider } from 'element-plus';
 
 const poiStore = usePoiStore();
 
@@ -117,6 +220,18 @@ const currentRibbon = computed(() => {
 const availableRibbons = computed(() => {
   // 这里只留四色带方案
   return ribbonColorSchemes.map(scheme => scheme.map(c => `rgb(${c.join(',')})`));
+});
+
+// 背景透明度值（0-100）
+const backgroundOpacityValue = computed({
+  get: () => {
+    const opacity = localSettings.value.backgroundMultiColorOpacity;
+    // 使用 nullish coalescing 来正确处理 0 值
+    return Math.round((opacity ?? 0.1) * 100);
+  },
+  set: (val) => {
+    localSettings.value.backgroundMultiColorOpacity = val / 100;
+  }
 });
 
 // 标记是否正在更新，避免watch循环
@@ -170,6 +285,69 @@ const handleBackgroundChange = (color) => {
   poiStore.updateColorSettings({
     background: color,
   });
+};
+
+const handleBackgroundModeChange = (mode) => {
+  localSettings.value.backgroundMode = mode;
+  poiStore.updateColorSettings({
+    backgroundMode: mode,
+  });
+  // 通知主视图区刷新标签云
+  if (poiStore.hasDrawing) {
+    setTimeout(() => {
+      if (window && window.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent('refreshTagCloud'));
+      }
+    }, 50);
+  }
+};
+
+const handleBackgroundOpacityChange = (value) => {
+  // 确保可以设置为 0
+  const opacity = value / 100;
+  localSettings.value.backgroundMultiColorOpacity = opacity;
+  poiStore.updateColorSettings({
+    backgroundMultiColorOpacity: opacity,
+  });
+  // 通知主视图区刷新标签云
+  if (poiStore.hasDrawing) {
+    setTimeout(() => {
+      if (window && window.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent('refreshTagCloud'));
+      }
+    }, 50);
+  }
+};
+
+const handleTextColorModeChange = (mode) => {
+  localSettings.value.textColorMode = mode;
+  poiStore.updateColorSettings({
+    textColorMode: mode,
+  });
+  // 通知主视图区刷新标签云
+  if (poiStore.hasDrawing) {
+    setTimeout(() => {
+      if (window && window.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent('refreshTagCloud'));
+      }
+    }, 50);
+  }
+};
+
+const handleTextSingleColorChange = (color) => {
+  if (!color) return;
+  localSettings.value.textSingleColor = color;
+  poiStore.updateColorSettings({
+    textSingleColor: color,
+  });
+  // 通知主视图区刷新标签云
+  if (poiStore.hasDrawing) {
+    setTimeout(() => {
+      if (window && window.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent('refreshTagCloud'));
+      }
+    }, 50);
+  }
 };
 
 let flipTimer = null;
@@ -352,6 +530,11 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
+  margin-bottom: 16px;
+}
+
+.color-item:last-child {
+  margin-bottom: 0;
 }
 
 .color-item.spaced {
