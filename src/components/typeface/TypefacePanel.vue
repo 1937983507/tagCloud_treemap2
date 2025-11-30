@@ -1,5 +1,40 @@
 <template>
   <section class="panel-card typeface-panel">
+    <!-- 语言选择 -->
+    <div class="config-section">
+      <div class="section-header">
+        <span class="section-title">语言</span>
+        <span class="section-desc">选择标签显示的语言</span>
+      </div>
+      <div class="section-content">
+        <el-select
+          v-model="localSettings.language"
+          style="width: 200px"
+          @change="handleLanguageChange"
+        >
+          <el-option label="中文" value="zh" />
+          <el-option label="English" value="en" />
+        </el-select>
+      </div>
+    </div>
+
+    <!-- 序号选择 -->
+    <div class="config-section">
+      <div class="section-header">
+        <span class="section-title">序号</span>
+        <span class="section-desc">是否在城市名前显示序号</span>
+      </div>
+      <div class="section-content">
+        <el-switch
+          v-model="localSettings.showCityIndex"
+          @change="handleShowCityIndexChange"
+        />
+        <span style="margin-left: 12px; font-size: 14px; color: #606266;">
+          {{ localSettings.showCityIndex ? '显示序号' : '不显示序号' }}
+        </span>
+      </div>
+    </div>
+
     <!-- 字号设置 -->
     <div class="config-section">
       <div class="section-header">
@@ -63,83 +98,105 @@
         <span class="section-desc">选择标签使用的字体</span>
       </div>
       <div class="section-content">
-        <el-tabs v-model="activeFontTab" stretch class="font-tabs">
-          <el-tab-pane
-            v-for="group in fontGroups"
-            :key="group.key"
-            :label="group.label"
-            :name="group.key"
+        <div class="font-gallery">
+          <button
+            v-for="font in filteredFonts"
+            :key="font"
+            class="font-chip"
+            :style="{ fontFamily: font }"
+            :class="{ active: poiStore.fontSettings.fontFamily === font }"
+            @click="handleFamilyChange(font)"
           >
-            <div class="font-gallery">
-              <button
-                v-for="font in group.fonts"
-                :key="font"
-                class="font-chip"
-                :style="{ fontFamily: font }"
-                :class="{ active: poiStore.fontSettings.fontFamily === font }"
-                @click="handleFamilyChange(font)"
-              >
-                <span class="font-name">{{ font }}</span>
-                <span 
-                  v-if="poiStore.fontSettings.fontFamily === font" 
-                  class="font-active-badge"
-                >
-                  使用中
-                </span>
-              </button>
-            </div>
-          </el-tab-pane>
-        </el-tabs>
+            <span class="font-name">{{ font }}</span>
+            <span 
+              v-if="poiStore.fontSettings.fontFamily === font" 
+              class="font-active-badge"
+            >
+              使用中
+            </span>
+          </button>
+        </div>
       </div>
     </div>
   </section>
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue';
+import { reactive, computed, watch } from 'vue';
 import { usePoiStore } from '@/stores/poiStore';
 
 const poiStore = usePoiStore();
-const activeFontTab = ref('cn');
 
 const localSettings = reactive({
+  language: poiStore.fontSettings.language || 'zh',
+  showCityIndex: poiStore.fontSettings.showCityIndex || false,
   minFontSize: poiStore.fontSettings.minFontSize,
   maxFontSize: poiStore.fontSettings.maxFontSize,
   fontWeight: poiStore.fontSettings.fontWeight,
 });
 
-const fontGroups = [
-  {
-    key: 'cn',
-    label: '中文',
-    fonts: [
-      '等线', '等线 Light', '方正舒体', '方正姚体', '仿宋', '黑体',
-      '华文彩云', '华文仿宋', '华文琥珀', '华文楷体', '华文隶书', '华文宋体', 
-      '华文细黑', '华文新魏', '华文行楷', '华文中宋', '楷体', '隶书', 
-      '宋体', '微软雅黑', '微软雅黑 Light', '新宋体', '幼圆', 'Source Han Sans',
-      '思源黑体', 'LXGW WenKai Screen', 'ZCOOL KuaiLe'
-    ],
-  },
-  {
-    key: 'en',
-    label: '英文',
-    fonts: [
-      'Inter', 'Montserrat', 'Roboto', 'Lato', 'Arial', 'Arial Black',
-      'Times New Roman', 'Georgia', 'Verdana', 'Courier New', 'Comic Sans MS',
-      'Impact', 'Trebuchet MS', 'Palatino', 'Garamond', 'Bookman',
-      'Helvetica', 'Tahoma', 'Lucida Console', 'Century Gothic', 'Franklin Gothic',
-      'Baskerville', 'Bodoni', 'Futura', 'Gill Sans', 'Optima'
-    ],
-  },
-  {
-    key: 'other',
-    label: '其他',
-    fonts: [
-      'Cormorant Garamond', 'Playfair Display', 'Lora', 'Merriweather',
-      'Open Sans', 'Raleway', 'Poppins', 'Nunito', 'Ubuntu', 'Oswald'
-    ],
-  },
+// 中文字体列表
+const chineseFonts = [
+  '等线', '等线 Light', '方正舒体', '方正姚体', '仿宋', '黑体',
+  '华文彩云', '华文仿宋', '华文琥珀', '华文楷体', '华文隶书', '华文宋体', 
+  '华文细黑', '华文新魏', '华文行楷', '华文中宋', '楷体', '隶书', 
+  '宋体', '微软雅黑', '微软雅黑 Light', '新宋体', '幼圆', '思源黑体'
 ];
+
+// 英文字体列表
+const englishFonts = [
+  'Arial', 'Inter', 'Times New Roman',  'Courier New', 'Comic Sans MS',
+  'Impact', 'Trebuchet MS', 'Palatino', 'Helvetica', 'Lucida Console', 
+  'Century Gothic', 'Franklin Gothic', 'Baskerville',
+];
+
+
+
+// 初始化时，如果字体不在对应语言的字体列表中，设置默认字体
+const currentLanguage = poiStore.fontSettings.language || 'zh';
+const availableFonts = currentLanguage === 'zh' ? chineseFonts : englishFonts;
+if (!availableFonts.includes(poiStore.fontSettings.fontFamily)) {
+  const defaultFont = currentLanguage === 'zh' ? '等线' : 'Arial';
+  poiStore.updateFontLevel({ fontFamily: defaultFont });
+}
+
+// 根据语言过滤字体
+const filteredFonts = computed(() => {
+  return localSettings.language === 'zh' ? chineseFonts : englishFonts;
+});
+
+// 监听语言变化，自动设置默认字体
+watch(
+  () => localSettings.language,
+  (newLanguage) => {
+    const defaultFont = newLanguage === 'zh' ? '等线' : 'Arial';
+    // 如果当前字体不在对应语言的字体列表中，则切换到默认字体
+    const availableFonts = newLanguage === 'zh' ? chineseFonts : englishFonts;
+    if (!availableFonts.includes(poiStore.fontSettings.fontFamily)) {
+      poiStore.updateFontLevel({ fontFamily: defaultFont });
+    }
+  }
+);
+
+function handleLanguageChange() {
+  const newLanguage = localSettings.language;
+  const availableFonts = newLanguage === 'zh' ? chineseFonts : englishFonts;
+  const defaultFont = newLanguage === 'zh' ? '等线' : 'Arial';
+  
+  // 如果当前字体不在新语言的字体列表中，则切换到默认字体
+  const updatePayload = { language: newLanguage };
+  if (!availableFonts.includes(poiStore.fontSettings.fontFamily)) {
+    updatePayload.fontFamily = defaultFont;
+  }
+  
+  poiStore.updateFontLevel(updatePayload);
+  // 语言变化需要重新编译数据并重绘（TagCloudCanvas.vue 中的 watch 会自动处理）
+}
+
+function handleShowCityIndexChange() {
+  poiStore.updateFontLevel({ showCityIndex: localSettings.showCityIndex });
+  // 序号变化需要重新计算位置，需要完整重绘（TagCloudCanvas.vue 中的 watch 会自动处理）
+}
 
 function handleWeightChange() {
   poiStore.updateFontLevel({ fontWeight: localSettings.fontWeight });

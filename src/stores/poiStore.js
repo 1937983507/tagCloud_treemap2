@@ -23,6 +23,8 @@ export const usePoiStore = defineStore('poiStore', {
       maxFontSize: 40,
       fontFamily: '等线',
       fontWeight: '700',
+      language: 'zh', // 语言选择：'zh' 中文，'en' 英文
+      showCityIndex: false, // 是否在城市名前显示序号
     },
     colorSettings: {
       background: 'rgb(255, 255, 255)',
@@ -96,10 +98,12 @@ export const usePoiStore = defineStore('poiStore', {
             const city = currentLine[3];
             const rankInCity = parseInt(currentLine[4]);
             const rankInChina = parseInt(currentLine[5]);
+            const name_en = currentLine.length >= 7 ? currentLine[6].trim() : ''; // 读取英文名，如果不存在则为空字符串
 
             const onePOI = {
               pid: i - 1,
               pname: pname,
+              name_en: name_en,
               X_gcj02: X_gcj02,
               Y_gcj02: Y_gcj02,
               lnglat: [X_gcj02, Y_gcj02],

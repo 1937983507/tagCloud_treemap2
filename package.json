@@ -18,7 +18,9 @@
     "element-plus": "^2.8.3",
     "intro.js": "^8.3.2",
     "lodash-es": "^4.17.21",
+    "marked": "^17.0.1",
     "pinia": "^2.2.4",
+    "pinyin-pro": "^3.27.0",
     "vue": "^3.5.11"
   },
   "devDependencies": {
@@ -29,4 +31,3 @@
     "vite": "^5.4.8"
   }
 }
-

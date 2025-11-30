@@ -86,6 +86,7 @@ import { usePoiStore } from '@/stores/poiStore';
 import * as d3 from 'd3';
 import cloud from 'd3-cloud';
 import { StripLayout, SpiralLayout, PivotLayout } from '@/utils/treemapLayouts';
+import { cityNameToPinyin } from '@/utils/cityNameToPinyin';
 import { ElButton, ElSpace, ElDropdown, ElDropdownMenu, ElDropdownItem, ElIcon, ElInputNumber, ElDialog, ElColorPicker, ElCheckbox } from 'element-plus';
 import { ArrowDown } from '@element-plus/icons-vue';
 
@@ -487,7 +488,15 @@ const drawWordCloud = (i, svg, cities, city, x, y, colorIndex, color, width, hei
   if (!isFinite(x) || !isFinite(y)) { if(resolve)resolve(); return; }
   const words = cities[city] ? cities[city].map(d => ({ text: d.text, size: d.size, color: color })) : [];
   if (words.length == 0) { if (resolve) resolve(); return; }
-  words.push({ text: city, size: 46, isCity: true, colorIndex: -1 });
+  // 根据语言设置选择城市名：中文使用原城市名，英文使用拼音
+  let cityName = poiStore.fontSettings.language === 'en' 
+    ? cityNameToPinyin(city) 
+    : city;
+  // 如果需要显示序号，在城市名前添加序号（序号从1开始）
+  if (poiStore.fontSettings.showCityIndex) {
+    cityName = `${i + 1}. ${cityName}`;
+  }
+  words.push({ text: cityName, size: 46, isCity: true, colorIndex: -1 });
   const layout = cloud()
     .size([width, height])
     .words(words)
@@ -814,6 +823,33 @@ watch(
   }
 );
 
+// 中文字体列表（用于判断字体类型）
+const chineseFonts = [
+  '等线', '等线 Light', '方正舒体', '方正姚体', '仿宋', '黑体',
+  '华文彩云', '华文仿宋', '华文琥珀', '华文楷体', '华文隶书', '华文宋体', 
+  '华文细黑', '华文新魏', '华文行楷', '华文中宋', '楷体', '隶书', 
+  '宋体', '微软雅黑', '微软雅黑 Light', '新宋体', '幼圆', '思源黑体'
+];
+
+// 英文字体列表（用于判断字体类型）
+const englishFonts = [
+  'Arial', 'Inter', 
+  'Times New Roman', 'Georgia', 'Verdana', 'Courier New', 'Comic Sans MS',
+  'Impact', 'Trebuchet MS', 'Palatino', 'Garamond', 
+  'Helvetica', 'Tahoma', 'Lucida Console', 'Century Gothic', 'Franklin Gothic',
+  'Baskerville',
+];
+
+// 判断字体是否为中文字体
+const isChineseFont = (fontName) => {
+  return chineseFonts.includes(fontName);
+};
+
+// 判断字体是否为英文字体
+const isEnglishFont = (fontName) => {
+  return englishFonts.includes(fontName);
+};
+
 // watch字体设置深度变化 - 区分字号变化和字体样式变化
 watch(
   () => poiStore.fontSettings,
@@ -826,23 +862,68 @@ watch(
       return;
     }
     
+    // 检查是否是语言变化
+    const isLanguageChanged = newVal.language !== oldVal.language;
+    
     // 检查是否是字号变化（minFontSize 或 maxFontSize）
     const isFontSizeChanged = 
       newVal.minFontSize !== oldVal.minFontSize || 
       newVal.maxFontSize !== oldVal.maxFontSize;
     
-    // 检查是否是字体样式变化（fontFamily 或 fontWeight）
-    const isFontStyleChanged = 
-      newVal.fontFamily !== oldVal.fontFamily || 
-      newVal.fontWeight !== oldVal.fontWeight;
+    // 检查是否是字体变化（fontFamily）
+    const isFontFamilyChanged = newVal.fontFamily !== oldVal.fontFamily;
     
-    if (isFontSizeChanged) {
+    // 检查是否是字重变化（fontWeight）
+    const isFontWeightChanged = newVal.fontWeight !== oldVal.fontWeight;
+    
+    // 检查是否是序号显示变化（showCityIndex）
+    const isShowCityIndexChanged = newVal.showCityIndex !== oldVal.showCityIndex;
+    
+    if (isLanguageChanged) {
+      // 语言变化需要重新编译数据并完整重绘
+      // PoiMap.vue 中的 watch 会自动重新编译数据
+      // 这里等待数据编译完成后再重绘
+      if (poiStore.hasDrawing) {
+        // 使用 nextTick 确保数据已经重新编译
+        nextTick(() => {
+          setTimeout(() => {
+            handleRenderCloud();
+          }, 100); // 给一点时间让数据编译完成
+        });
+      }
+    } else if (isShowCityIndexChanged) {
+      // 序号显示变化需要重新计算布局（因为序号会影响标签文本长度），需要完整重绘
+      if (poiStore.hasDrawing) {
+        handleRenderCloud();
+      }
+    } else if (isFontSizeChanged) {
       // 字号变化需要重新计算字号分配和布局，需要完整重绘
       if (poiStore.hasDrawing) {
         handleRenderCloud();
       }
-    } else if (isFontStyleChanged && poiStore.hasDrawing && svg) {
-      // 字体样式变化（字体、字重）只需要更新样式，不重绘
+    } else if (isFontFamilyChanged) {
+      // 字体变化：需要根据字体类型决定处理方式
+      const newFontIsChinese = isChineseFont(newVal.fontFamily);
+      const oldFontIsChinese = isChineseFont(oldVal.fontFamily);
+      
+      if (newFontIsChinese && oldFontIsChinese) {
+        // 中文字体之间的切换：只需要更新样式，不重绘
+        if (poiStore.hasDrawing && svg) {
+          updateFontStylesOnly();
+        }
+      } else if (isEnglishFont(newVal.fontFamily) || isEnglishFont(oldVal.fontFamily)) {
+        // 涉及英文字体的变化：需要完整重绘（因为英文字体变化可能导致标签大小变化）
+        if (poiStore.hasDrawing) {
+          handleRenderCloud();
+        }
+      } else {
+        // 其他情况（未知字体）：为了安全起见，完整重绘
+        if (poiStore.hasDrawing) {
+          handleRenderCloud();
+        }
+      }
+    } else if (isFontWeightChanged && poiStore.hasDrawing && svg) {
+      // 字重变化：只需要更新样式，不重绘
       updateFontStylesOnly();
     } else if (poiStore.hasDrawing) {
       // 其他情况，需要完整渲染

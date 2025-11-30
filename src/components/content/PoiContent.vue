@@ -2,7 +2,7 @@
   <section class="panel-card content-panel">
     <div class="work-grid">
       <div class="map-container">
-        <PoiMap />
+        <PoiMap ref="poiMapRef" />
       </div>
       <LocationGraph class="table-card-placeholder" />
     </div>
@@ -10,8 +10,16 @@
 </template>
 
 <script setup>
+import { ref } from 'vue';
 import PoiMap from './PoiMap.vue';
 import LocationGraph from './LocationGraph.vue';
+
+const poiMapRef = ref(null);
+
+// 暴露 poiMapRef 以便外部访问
+defineExpose({
+  poiMapRef,
+});
 </script>
 
 <style scoped>
