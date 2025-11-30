@@ -819,6 +819,33 @@ watch(
   }
 );
 
+// 中文字体列表（用于判断字体类型）
+const chineseFonts = [
+  '等线', '等线 Light', '方正舒体', '方正姚体', '仿宋', '黑体',
+  '华文彩云', '华文仿宋', '华文琥珀', '华文楷体', '华文隶书', '华文宋体', 
+  '华文细黑', '华文新魏', '华文行楷', '华文中宋', '楷体', '隶书', 
+  '宋体', '微软雅黑', '微软雅黑 Light', '新宋体', '幼圆', '思源黑体'
+];
+
+// 英文字体列表（用于判断字体类型）
+const englishFonts = [
+  'Arial', 'Inter', 
+  'Times New Roman', 'Georgia', 'Verdana', 'Courier New', 'Comic Sans MS',
+  'Impact', 'Trebuchet MS', 'Palatino', 'Garamond', 
+  'Helvetica', 'Tahoma', 'Lucida Console', 'Century Gothic', 'Franklin Gothic',
+  'Baskerville',
+];
+
+// 判断字体是否为中文字体
+const isChineseFont = (fontName) => {
+  return chineseFonts.includes(fontName);
+};
+
+// 判断字体是否为英文字体
+const isEnglishFont = (fontName) => {
+  return englishFonts.includes(fontName);
+};
+
 // watch字体设置深度变化 - 区分字号变化和字体样式变化
 watch(
   () => poiStore.fontSettings,
@@ -839,10 +866,11 @@ watch(
       newVal.minFontSize !== oldVal.minFontSize || 
       newVal.maxFontSize !== oldVal.maxFontSize;
     
-    // 检查是否是字体样式变化（fontFamily 或 fontWeight）
-    const isFontStyleChanged = 
-      newVal.fontFamily !== oldVal.fontFamily || 
-      newVal.fontWeight !== oldVal.fontWeight;
+    // 检查是否是字体变化（fontFamily）
+    const isFontFamilyChanged = newVal.fontFamily !== oldVal.fontFamily;
+    
+    // 检查是否是字重变化（fontWeight）
+    const isFontWeightChanged = newVal.fontWeight !== oldVal.fontWeight;
     
     if (isLanguageChanged) {
       // 语言变化需要重新编译数据并完整重绘
@@ -861,8 +889,29 @@ watch(
       if (poiStore.hasDrawing) {
         handleRenderCloud();
       }
-    } else if (isFontStyleChanged && poiStore.hasDrawing && svg) {
-      // 字体样式变化（字体、字重）只需要更新样式，不重绘
+    } else if (isFontFamilyChanged) {
+      // 字体变化：需要根据字体类型决定处理方式
+      const newFontIsChinese = isChineseFont(newVal.fontFamily);
+      const oldFontIsChinese = isChineseFont(oldVal.fontFamily);
+      
+      if (newFontIsChinese && oldFontIsChinese) {
+        // 中文字体之间的切换：只需要更新样式，不重绘
+        if (poiStore.hasDrawing && svg) {
+          updateFontStylesOnly();
+        }
+      } else if (isEnglishFont(newVal.fontFamily) || isEnglishFont(oldVal.fontFamily)) {
+        // 涉及英文字体的变化：需要完整重绘（因为英文字体变化可能导致标签大小变化）
+        if (poiStore.hasDrawing) {
+          handleRenderCloud();
+        }
+      } else {
+        // 其他情况（未知字体）：为了安全起见，完整重绘
+        if (poiStore.hasDrawing) {
+          handleRenderCloud();
+        }
+      }
+    } else if (isFontWeightChanged && poiStore.hasDrawing && svg) {
+      // 字重变化：只需要更新样式，不重绘
       updateFontStylesOnly();
     } else if (poiStore.hasDrawing) {
       // 其他情况，需要完整渲染

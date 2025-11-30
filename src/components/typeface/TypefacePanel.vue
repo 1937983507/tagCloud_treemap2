@@ -127,11 +127,9 @@ const chineseFonts = [
 
 // 英文字体列表
 const englishFonts = [
-  'Arial', 'Inter', 
-  'Times New Roman', 'Georgia', 'Verdana', 'Courier New', 'Comic Sans MS',
-  'Impact', 'Trebuchet MS', 'Palatino', 'Garamond', 
-  'Helvetica', 'Tahoma', 'Lucida Console', 'Century Gothic', 'Franklin Gothic',
-  'Baskerville',
+  'Arial', 'Inter', 'Times New Roman',  'Courier New', 'Comic Sans MS',
+  'Impact', 'Trebuchet MS', 'Palatino', 'Helvetica', 'Lucida Console', 
+  'Century Gothic', 'Franklin Gothic', 'Baskerville',
 ];
 
 
