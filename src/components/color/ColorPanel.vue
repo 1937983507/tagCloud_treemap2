@@ -618,7 +618,7 @@ onMounted(() => {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 16px;
-  max-height: 400px;
+  max-height:350px;
   overflow-y: auto;
   padding: 4px;
 }

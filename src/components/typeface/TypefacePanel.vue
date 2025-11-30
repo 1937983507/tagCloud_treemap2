@@ -311,7 +311,7 @@ function handleMaxFontSizeChange() {
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 12px;
   margin-top: 0;
-  max-height: 450px;
+  max-height: 250px;
   overflow-y: auto;
   padding: 4px;
 }
