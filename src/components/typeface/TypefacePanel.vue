@@ -18,6 +18,23 @@
       </div>
     </div>
 
+    <!-- 序号选择 -->
+    <div class="config-section">
+      <div class="section-header">
+        <span class="section-title">序号</span>
+        <span class="section-desc">是否在城市名前显示序号</span>
+      </div>
+      <div class="section-content">
+        <el-switch
+          v-model="localSettings.showCityIndex"
+          @change="handleShowCityIndexChange"
+        />
+        <span style="margin-left: 12px; font-size: 14px; color: #606266;">
+          {{ localSettings.showCityIndex ? '显示序号' : '不显示序号' }}
+        </span>
+      </div>
+    </div>
+
     <!-- 字号设置 -->
     <div class="config-section">
       <div class="section-header">
@@ -112,6 +129,7 @@ const poiStore = usePoiStore();
 
 const localSettings = reactive({
   language: poiStore.fontSettings.language || 'zh',
+  showCityIndex: poiStore.fontSettings.showCityIndex || false,
   minFontSize: poiStore.fontSettings.minFontSize,
   maxFontSize: poiStore.fontSettings.maxFontSize,
   fontWeight: poiStore.fontSettings.fontWeight,
@@ -173,6 +191,11 @@ function handleLanguageChange() {
   
   poiStore.updateFontLevel(updatePayload);
   // 语言变化需要重新编译数据并重绘（TagCloudCanvas.vue 中的 watch 会自动处理）
+}
+
+function handleShowCityIndexChange() {
+  poiStore.updateFontLevel({ showCityIndex: localSettings.showCityIndex });
+  // 序号变化需要重新计算位置，需要完整重绘（TagCloudCanvas.vue 中的 watch 会自动处理）
 }
 
 function handleWeightChange() {

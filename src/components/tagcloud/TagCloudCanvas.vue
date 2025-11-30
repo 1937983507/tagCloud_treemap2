@@ -489,9 +489,13 @@ const drawWordCloud = (i, svg, cities, city, x, y, colorIndex, color, width, hei
   const words = cities[city] ? cities[city].map(d => ({ text: d.text, size: d.size, color: color })) : [];
   if (words.length == 0) { if (resolve) resolve(); return; }
   // 根据语言设置选择城市名：中文使用原城市名，英文使用拼音
-  const cityName = poiStore.fontSettings.language === 'en' 
+  let cityName = poiStore.fontSettings.language === 'en' 
     ? cityNameToPinyin(city) 
     : city;
+  // 如果需要显示序号，在城市名前添加序号（序号从1开始）
+  if (poiStore.fontSettings.showCityIndex) {
+    cityName = `${i + 1}. ${cityName}`;
+  }
   words.push({ text: cityName, size: 46, isCity: true, colorIndex: -1 });
   const layout = cloud()
     .size([width, height])
@@ -872,6 +876,9 @@ watch(
     // 检查是否是字重变化（fontWeight）
     const isFontWeightChanged = newVal.fontWeight !== oldVal.fontWeight;
     
+    // 检查是否是序号显示变化（showCityIndex）
+    const isShowCityIndexChanged = newVal.showCityIndex !== oldVal.showCityIndex;
+    
     if (isLanguageChanged) {
       // 语言变化需要重新编译数据并完整重绘
       // PoiMap.vue 中的 watch 会自动重新编译数据
@@ -883,6 +890,11 @@ watch(
             handleRenderCloud();
           }, 100); // 给一点时间让数据编译完成
         });
+      }
+    } else if (isShowCityIndexChanged) {
+      // 序号显示变化需要重新计算布局（因为序号会影响标签文本长度），需要完整重绘
+      if (poiStore.hasDrawing) {
+        handleRenderCloud();
       }
     } else if (isFontSizeChanged) {
       // 字号变化需要重新计算字号分配和布局，需要完整重绘
