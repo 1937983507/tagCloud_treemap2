@@ -370,7 +370,7 @@
 
 ### 1. 官方文档
 
-- [概述/快速上手/入门教程（PDF 合集）](/doc/地名标签云-概述.pdf)
+- [概述/快速上手/入门教程（PDF 合集）](/doc/地名标签云-概述.pdf)(待更新)
 
 ### 2. 技术参考
 
@@ -443,7 +443,7 @@
 ### 1. 项目资源
 
 - **GitHub 仓库**：[https://github.com/1937983507/tagCloud_treemap2](https://github.com/1937983507/tagCloud_treemap2)
-- **在线演示**：[https://www.hubutagcloud.cn/treemap](https://www.hubutagcloud.cn/treemap)
+- **在线演示**：[https://www.hubutagcloud.cn/treemap](https://www.hubutagcloud.cn/treemap/)
 - **项目主页**：访问项目 GitHub 主页获取最新版本、更新日志和开发文档
 
 ### 2. 问题反馈与技术支持
@@ -474,7 +474,7 @@
 - **时空大数据可视化**：利用大数据技术与可视化方法，将地理信息、兴趣点数据与空间分析结果以直观方式呈现
 - **泛地图学理论与方法**：探索新型地图可视化方法，包括隐喻地图和创新可视化技术
 
-更多团队信息请访问：[湖北大学制图组官网](https://www.hubutagcloud.cn/hubuCartographicGroup)
+更多团队信息请访问：[湖北大学制图组官网](https://hubutagcloud.cn/cxq-group/)
 
 ---
 

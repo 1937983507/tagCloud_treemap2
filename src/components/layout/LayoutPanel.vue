@@ -29,13 +29,15 @@ import { usePoiStore } from '@/stores/poiStore';
 const poiStore = usePoiStore();
 
 const layouts = [
-  { value: 'Resquarify', name: 'Resquarify', img: '/img/Resquarify.png' },
-  { value: 'Dice', name: 'Dice', img: '/img/Dice.png' },
-  { value: 'Slice', name: 'Slice', img: '/img/Slice.png' },
-  { value: 'Binary', name: 'Binary', img: '/img/Binary.png' },
-  { value: 'Strip', name: 'Strip', img: '/img/Strip.png' },
-  { value: 'Spiral', name: 'Spiral', img: '/img/Spiral.png' },
-  { value: 'Pivot', name: 'Pivot', img: '/img/Pivot.png' },
+  // 这里使用相对路径而不是以 / 开头的绝对路径，
+  // 以便在部署到子路径（例如 /treemap/）时能正确跟随 Vite 的 base 配置
+  { value: 'Resquarify', name: 'Resquarify', img: 'img/Resquarify.png' },
+  { value: 'Dice', name: 'Dice', img: 'img/Dice.png' },
+  { value: 'Slice', name: 'Slice', img: 'img/Slice.png' },
+  { value: 'Binary', name: 'Binary', img: 'img/Binary.png' },
+  { value: 'Strip', name: 'Strip', img: 'img/Strip.png' },
+  { value: 'Spiral', name: 'Spiral', img: 'img/Spiral.png' },
+  { value: 'Pivot', name: 'Pivot', img: 'img/Pivot.png' },
 ];
 
 const currentLayout = computed(() => poiStore.lineType);

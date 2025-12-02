@@ -54,7 +54,12 @@
 const emit = defineEmits(['navigate']);
 
 const handleLinkClick = (key) => {
-  emit('navigate', key);
+  if (key === 'about') {
+    // 关于我们页面跳转到外部链接
+    window.open('https://hubutagcloud.cn/cxq-group/', '_blank');
+  } else {
+    emit('navigate', key);
+  }
 };
 </script>
 

@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia';
 import axios from 'axios';
 
-const DATA_URL = '/data/chinapoi.csv';
+// 使用相对路径，确保在 base 为 /treemap/ 等子路径部署时仍然能正确访问
+const DATA_URL = 'data/chinapoi.csv';
 
 export const usePoiStore = defineStore('poiStore', {
   state: () => ({

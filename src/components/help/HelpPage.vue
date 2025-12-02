@@ -256,15 +256,28 @@ const processMarkdownContent = (html, imageScaleMap = new Map()) => {
         }
       }
       
-      // 处理路径转换
+      // 处理路径转换 - 使用相对路径以适配 base 配置（如 /treemap/）
+      // 这样构建后路径会自动加上 base 前缀，变成 /treemap/img/xxx.png
       let src = originalSrc;
-      if (src.startsWith('../img/')) {
-        src = src.replace('../img/', '/img/');
+      
+      // 处理各种可能的路径格式
+      if (src.includes('public/img/')) {
+        // 从 ../../../public/img/xxx.png 或 public/img/xxx.png 提取出 img/xxx.png
+        src = src.replace(/.*public\/img\//, 'img/');
+      } else if (src.includes('../img/')) {
+        // 处理 ../img/ 或 ../../../img/ 等情况
+        src = src.replace(/.*\/img\//, 'img/');
+      } else if (src.startsWith('/img/')) {
+        // 如果已经是绝对路径 /img/xxx.png，改为相对路径 img/xxx.png
+        src = src.replace(/^\/img\//, 'img/');
       } else if (src.startsWith('img/')) {
-        src = '/' + src;
-      } else if (!src.startsWith('/') && !src.startsWith('http')) {
-        src = '/img/' + src;
+        // 已经是相对路径 img/xxx.png，保持不变
+        // 不做任何处理
+      } else if (!src.startsWith('http') && !src.startsWith('//') && !src.startsWith('/')) {
+        // 如果既不是 http/https 协议，也不是绝对路径，添加 img/ 前缀
+        src = 'img/' + src;
       }
+      // 其他情况（如 http:// 或 // 开头的 URL）保持不变
       
       // 如果原始路径没找到，尝试用处理后的路径查找
       if (scaleValue === '50%' && imageScaleMap.has(src)) {
@@ -593,15 +606,13 @@ onMounted(() => {
     }
   });
 
-  // 配置 marked 选项
-  marked.setOptions({
+  // 配置 marked 选项 - marked 17+ 使用 marked.use() 或直接传递配置
+  // 注意：marked 17 移除了 setOptions，改为在 parse 时传递配置或使用 marked.use()
+  marked.use({
     breaks: true,
     gfm: true,
-    // 确保加粗、斜体等格式正常工作
     pedantic: false,
-    sanitize: false,
     smartLists: true,
-    smartypants: false,
   });
 });
 
