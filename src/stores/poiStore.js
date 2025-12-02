@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia';
 import axios from 'axios';
 
-const DATA_URL = '/data/chinapoi.csv';
+// 使用相对路径，确保在 base 为 /treemap/ 等子路径部署时仍然能正确访问
+const DATA_URL = 'data/chinapoi.csv';
 
 export const usePoiStore = defineStore('poiStore', {
   state: () => ({
@@ -30,6 +31,14 @@ export const usePoiStore = defineStore('poiStore', {
       background: 'rgb(255, 255, 255)',
       palette: ['rgb(31,119,180)', 'rgb(255,127,14)', 'rgb(44,160,44)', 'rgb(214,39,40)'],
       inverted: false,
+      // 背景配色模式：'single' 单色，'multi' 复色
+      backgroundMode: 'single',
+      // 文字配色模式：'single' 单色，'multi' 复色
+      textColorMode: 'multi',
+      // 背景复色模式的透明度（0-1）
+      backgroundMultiColorOpacity: 0.1,
+      // 文字单色模式的颜色
+      textSingleColor: 'rgb(0, 0, 0)',
       // 移除 discreteMethod, discreteCount
     },
     lineType: 'Resquarify', // 默认布局方式已调整为Resquarify

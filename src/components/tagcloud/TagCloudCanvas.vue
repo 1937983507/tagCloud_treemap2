@@ -44,7 +44,7 @@
     </el-dialog>
     <div class="canvas-wrapper" ref="wrapperRef">
       <svg ref="svgRef"
-           :style="{ background: poiStore.colorSettings.background }"
+           :style="{ background: poiStore.colorSettings.backgroundMode === 'single' ? poiStore.colorSettings.background : 'transparent' }"
       ></svg>
       <div v-if="(!poiStore.hasDrawing || !poiStore.cityOrder.length) && !cloudLoading" class="empty-cloud-hint">
         <div class="hint-content">
@@ -108,6 +108,7 @@ let graph = null;
 let currentRoot = null;
 let currentCityOrder = null;
 let currentLayoutType = null;
+let currentColorIndexs = null; // 保存当前的颜色索引，用于更新背景
 let secondIntroStarted = false;
 
 // loading 遮罩状态
@@ -456,30 +457,83 @@ const updateFontStylesOnly = () => {
 const updateColorsOnly = () => {
   if (!svg) return;
   
+  const textColorMode = poiStore.colorSettings.textColorMode || 'multi';
+  const textSingleColor = poiStore.colorSettings.textSingleColor || 'rgb(0, 0, 0)';
+  
+  // 更新背景矩形（如果背景模式是复色）
+  if (poiStore.colorSettings.backgroundMode === 'multi') {
+    const opacity = poiStore.colorSettings.backgroundMultiColorOpacity ?? 0.1;
+    const leaves = currentRoot?.leaves() || [];
+    const cityOrder = currentCityOrder || [];
+    const colorindexs = currentColorIndexs;
+    
+    if (leaves.length > 0 && cityOrder.length > 0 && colorindexs) {
+      svg.selectAll("rect.treemap-background").remove();
+      
+      leaves.forEach((d, i) => {
+        const city = d.data.city;
+        const cityIndex = cityOrder.indexOf(city);
+        if (cityIndex === -1) return;
+        
+        const colorIndex = colorindexs[cityIndex] - 1;
+        const bgColor = poiStore.Colors[colorIndex % poiStore.Colors.length];
+        
+        // 将颜色转换为rgba格式以支持透明度
+        let rgbaColor = bgColor;
+        if (bgColor.startsWith('#')) {
+          const hex = bgColor.slice(1);
+          const r = parseInt(hex.slice(0, 2), 16);
+          const g = parseInt(hex.slice(2, 4), 16);
+          const b = parseInt(hex.slice(4, 6), 16);
+          rgbaColor = `rgba(${r}, ${g}, ${b}, ${opacity})`;
+        } else if (bgColor.startsWith('rgb')) {
+          const rgbMatch = bgColor.match(/\d+/g);
+          if (rgbMatch && rgbMatch.length >= 3) {
+            rgbaColor = `rgba(${rgbMatch[0]}, ${rgbMatch[1]}, ${rgbMatch[2]}, ${opacity})`;
+          }
+        }
+        
+        svg.insert("rect", () => svg.select("#city-route-path").node()?.nextSibling || null)
+          .attr("x", d.x0)
+          .attr("y", d.y0)
+          .attr("width", d.x1 - d.x0)
+          .attr("height", d.y1 - d.y0)
+          .attr("fill", rgbaColor)
+          .attr("stroke", "none")
+          .attr("class", "treemap-background");
+      });
+    }
+  } else {
+    // 如果背景模式是单色，移除所有背景矩形
+    svg.selectAll("rect.treemap-background").remove();
+  }
+  
   // 遍历所有词云 group，根据 colorIndex 更新颜色
   svg.selectAll("g[data-colorindex]").each(function() {
     const g = d3.select(this);
     const colorIndexAttr = g.attr("data-colorindex");
     const colorIndex = parseInt(colorIndexAttr);
     
-    // 如果 colorIndex 无效，跳过
-    if (isNaN(colorIndex) || colorIndex < 0) {
-      // 城市标签保持红色（colorIndex 为 -1 的情况）
-      g.selectAll("text.city-label")
-        .style("fill", "red");
-      return;
-    }
-    
-    // 获取新的颜色
-    const newColor = poiStore.Colors[colorIndex % poiStore.Colors.length];
-    
-    // 更新该 group 下所有非城市标签的文本颜色
-    g.selectAll("text.word")
-      .style("fill", newColor);
-    
     // 城市标签保持红色
     g.selectAll("text.city-label")
       .style("fill", "red");
+    
+    // 如果 colorIndex 无效，跳过
+    if (isNaN(colorIndex) || colorIndex < 0) {
+      return;
+    }
+    
+    // 根据文字配色模式更新颜色
+    if (textColorMode === 'single') {
+      // 单色模式：所有文字使用统一颜色
+      g.selectAll("text.word")
+        .style("fill", textSingleColor);
+    } else {
+      // 复色模式：使用原来的颜色逻辑
+      const newColor = poiStore.Colors[colorIndex % poiStore.Colors.length];
+      g.selectAll("text.word")
+        .style("fill", newColor);
+    }
   });
 };
 
@@ -497,6 +551,11 @@ const drawWordCloud = (i, svg, cities, city, x, y, colorIndex, color, width, hei
     cityName = `${i + 1}. ${cityName}`;
   }
   words.push({ text: cityName, size: 46, isCity: true, colorIndex: -1 });
+  
+  // 判断文字配色模式
+  const textColorMode = poiStore.colorSettings.textColorMode || 'multi';
+  const textSingleColor = poiStore.colorSettings.textSingleColor || 'rgb(0, 0, 0)';
+  
   const layout = cloud()
     .size([width, height])
     .words(words)
@@ -518,7 +577,16 @@ const drawWordCloud = (i, svg, cities, city, x, y, colorIndex, color, width, hei
         .style("font-size", d => d.size + "px")
         .style("font-family", poiStore.fontSettings.fontFamily || "Arial")
         .style("font-weight", poiStore.fontSettings.fontWeight || "700")
-        .style("fill", d => d.isCity ? "red" : d.color)
+        .style("fill", d => {
+          // 城市标签保持红色
+          if (d.isCity) return "red";
+          // 文字配色模式：单色使用统一颜色，复色使用原来的颜色
+          if (textColorMode === 'single') {
+            return textSingleColor;
+          } else {
+            return d.color;
+          }
+        })
         .attr("text-anchor", "middle")
         .attr("transform", d => `translate(${d.x},${d.y})rotate(${d.rotate})`)
         .text(d => d.text);
@@ -560,12 +628,52 @@ const drawAllWordClouds = async (svg, data, cityOrder, width, height, lineType) 
   currentRoot = root;
   currentCityOrder = cityOrder;
   currentLayoutType = lineType;
+  currentColorIndexs = colorindexs; // 保存颜色索引
 
   drawSVGLine(svg, root, cityOrder, {
     lineType: poiStore.linePanel?.type,
     width: poiStore.linePanel?.width,
     color: poiStore.linePanel?.color
   });
+
+  // 如果背景模式是复色，绘制背景矩形
+  if (poiStore.colorSettings.backgroundMode === 'multi') {
+    const opacity = poiStore.colorSettings.backgroundMultiColorOpacity ?? 0.1;
+    leaves.forEach((d, i) => {
+      const city = d.data.city;
+      const cityIndex = cityOrder.indexOf(city);
+      if (cityIndex === -1) return;
+      
+      const colorIndex = colorindexs[cityIndex] - 1;
+      const bgColor = poiStore.Colors[colorIndex % poiStore.Colors.length];
+      
+      // 将颜色转换为rgba格式以支持透明度
+      let rgbaColor = bgColor;
+      if (bgColor.startsWith('#')) {
+        const hex = bgColor.slice(1);
+        const r = parseInt(hex.slice(0, 2), 16);
+        const g = parseInt(hex.slice(2, 4), 16);
+        const b = parseInt(hex.slice(4, 6), 16);
+        rgbaColor = `rgba(${r}, ${g}, ${b}, ${opacity})`;
+      } else if (bgColor.startsWith('rgb')) {
+        // 如果是rgb格式，转换为rgba
+        const rgbMatch = bgColor.match(/\d+/g);
+        if (rgbMatch && rgbMatch.length >= 3) {
+          rgbaColor = `rgba(${rgbMatch[0]}, ${rgbMatch[1]}, ${rgbMatch[2]}, ${opacity})`;
+        }
+      }
+      
+      // 绘制背景矩形，确保在路径之后、词云之前
+      svg.insert("rect", () => svg.select("#city-route-path").node()?.nextSibling || null)
+        .attr("x", d.x0)
+        .attr("y", d.y0)
+        .attr("width", d.x1 - d.x0)
+        .attr("height", d.y1 - d.y0)
+        .attr("fill", rgbaColor)
+        .attr("stroke", "none")
+        .attr("class", "treemap-background");
+    });
+  }
 
   const cityInfo = {};
   leaves.forEach(d => {
@@ -648,6 +756,7 @@ const handleRenderCloud = async () => {
     currentRoot = null;
     currentCityOrder = null;
     currentLayoutType = null;
+    currentColorIndexs = null;
     const data = poiStore.compiledData;
     const cityOrder = poiStore.cityOrder;
     const lineType = poiStore.lineType || 'Pivot';
@@ -805,6 +914,8 @@ watch(
       currentRoot = null;
       currentCityOrder = null;
       currentLayoutType = null;
+      currentColorIndexs = null;
+      currentColorIndexs = null;
     }
   }
 );

@@ -25,7 +25,8 @@ const extractJsonFromText = (text) => {
 
 export const loadGeoJson = async () => {
   if (cachedGeojson) return cachedGeojson;
-  const response = await fetch('/data/shi.js');
+  // 使用相对路径，避免 base 为 /treemap/ 时请求落在站点根目录
+  const response = await fetch('data/shi.js');
   if (!response.ok) {
     throw new Error(`geojson加载失败：${response.status}`);
   }
