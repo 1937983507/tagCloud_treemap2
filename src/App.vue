@@ -58,6 +58,39 @@ const showHelpPage = ref(false);
 const showFeedbackPage = ref(false);
 
 let firstIntroStarted = false;
+let currentIntro = null;
+
+// localStorage key for tutorial preference
+const TUTORIAL_DISABLED_KEY = 'tagCloud_treemap2_tutorialDisabled';
+
+// Check if tutorial should be disabled
+const shouldDisableTutorial = () => {
+  return localStorage.getItem(TUTORIAL_DISABLED_KEY) === 'true';
+};
+
+// Save tutorial preference
+const saveTutorialPreference = (disabled) => {
+  localStorage.setItem(TUTORIAL_DISABLED_KEY, disabled ? 'true' : 'false');
+};
+
+// Get current tutorial preference
+const getTutorialPreference = () => {
+  return localStorage.getItem(TUTORIAL_DISABLED_KEY) === 'true';
+};
+
+// Expose function to window for inline event handler
+if (typeof window !== 'undefined') {
+  window.__saveTutorialPreference_treemap2 = saveTutorialPreference;
+  window.__getTutorialPreference_treemap2 = getTutorialPreference;
+}
+
+// Helper function to add checkbox to intro content
+const addCheckboxToIntro = (content) => {
+  const isChecked = getTutorialPreference();
+  const checkedAttr = isChecked ? 'checked' : '';
+  const checkboxHtml = `<div style="margin-top:16px;padding-top:16px;border-top:1px solid #e2e8f0;text-align:left;"><label style="display:flex;align-items:center;cursor:pointer;font-size:13px;color:#64748b;"><input type="checkbox" class="tutorial-disable-checkbox-treemap2" ${checkedAttr} style="margin-right:8px;cursor:pointer;width:16px;height:16px;" onchange="window.__saveTutorialPreference_treemap2 && window.__saveTutorialPreference_treemap2(this.checked); const allCheckboxes = document.querySelectorAll('.tutorial-disable-checkbox-treemap2'); allCheckboxes.forEach(cb => cb.checked = this.checked);" /><span>最近不再默认显示此引导</span></label></div>`;
+  return content + checkboxHtml;
+};
 
 const handleChangePanel = (panel) => {
   activePanel.value = panel;
@@ -131,48 +164,66 @@ const getTutorialButtonElement = () => {
 };
 
 const createIntro = () => {
+  // Check if introJs is available
+  if (!introJs || typeof introJs.tour !== 'function') {
+    console.error('Intro.js is not properly loaded');
+    throw new Error('Intro.js is not properly loaded');
+  }
+  
   const intro = introJs.tour();
-  intro.addSteps([
+  
+  // Build steps array with checkbox in each step
+  const steps = [
     {
-      intro:
-        '<div style="text-align:center;padding:8px 0;"><div style="font-size:18px;font-weight:600;margin-bottom:8px;">欢迎体验地名标签云</div><div style="font-size:13px;color:#64748b;">我们将带您快速认识核心功能，帮助更顺利地生成路线标签云。</div></div>',
+      intro: addCheckboxToIntro(
+        '<div style="text-align:center;padding:8px 0;"><div style="font-size:18px;font-weight:600;margin-bottom:8px;">欢迎体验地名标签云</div><div style="font-size:13px;color:#64748b;">我们将带您快速认识核心功能，帮助更顺利地生成路线标签云。</div></div>'
+      ),
     },
     {
       element: getHeaderElement(),
-      intro:
-        '<div style="line-height:1.6;"><strong style="font-size:16px;color:#1f2333;">导航栏</strong><br/><span style="color:#64748b;">这里可以返回首页、查看帮助或反馈意见。点击右上角的<span style="color:#399ceb;">"引导教程"</span>图标可再次查看本引导。</span></div>',
+      intro: addCheckboxToIntro(
+        '<div style="line-height:1.6;"><strong style="font-size:16px;color:#1f2333;">导航栏</strong><br/><span style="color:#64748b;">这里可以返回首页、查看帮助或反馈意见。点击右上角的<span style="color:#399ceb;">"引导教程"</span>图标可再次查看本引导。</span></div>'
+      ),
     },
     {
       element: getSideMenuElement(),
-      intro:
-        '<div style="line-height:1.6;"><strong style="font-size:16px;color:#1f2333;">侧边面板</strong><br/><span style="color:#64748b;">按照“内容 → 字体 → 配色 → 布局 → 线条”的顺序逐步完善展示效果。</span></div>',
+      intro: addCheckboxToIntro(
+        '<div style="line-height:1.6;"><strong style="font-size:16px;color:#1f2333;">侧边面板</strong><br/><span style="color:#64748b;">按照"内容 → 字体 → 配色 → 布局 → 线条"的顺序逐步完善展示效果。</span></div>'
+      ),
     },
     {
       element: getMapElement(),
-      intro:
-        '<div style="line-height:1.6;"><strong style="font-size:16px;color:#1f2333;">地图绘制区</strong><br/><span style="color:#64748b;">在此绘制折线或选择路线，系统将根据经过的城市提取景点数据。</span></div>',
+      intro: addCheckboxToIntro(
+        '<div style="line-height:1.6;"><strong style="font-size:16px;color:#1f2333;">地图绘制区</strong><br/><span style="color:#64748b;">在此绘制折线或选择路线，系统将根据经过的城市提取景点数据。</span></div>'
+      ),
     },
     {
       element: getGraphElement(),
-      intro:
-        '<div style="line-height:1.6;"><strong style="font-size:16px;color:#1f2333;">数据分析视图</strong><br/><span style="color:#64748b;">实时查看城市关联、路径统计等信息，帮助评估线路覆盖情况。</span></div>',
+      intro: addCheckboxToIntro(
+        '<div style="line-height:1.6;"><strong style="font-size:16px;color:#1f2333;">数据分析视图</strong><br/><span style="color:#64748b;">实时查看城市关联、路径统计等信息，帮助评估线路覆盖情况。</span></div>'
+      ),
     },
     {
       element: getTagCloudPanelElement(),
-      intro:
-        '<div style="line-height:1.6;"><strong style="font-size:16px;color:#1f2333;">标签云控制面板</strong><br/><span style="color:#64748b;">点击“运行生成标签云”并根据需求调整导出、字号、配色等参数。</span></div>',
+      intro: addCheckboxToIntro(
+        '<div style="line-height:1.6;"><strong style="font-size:16px;color:#1f2333;">标签云控制面板</strong><br/><span style="color:#64748b;">点击"运行生成标签云"并根据需求调整导出、字号、配色等参数。</span></div>'
+      ),
     },
     {
       element: getCanvasElement(),
-      intro:
-        '<div style="line-height:1.6;"><strong style="font-size:16px;color:#1f2333;">标签云画布</strong><br/><span style="color:#64748b;">生成结果会显示在此处，可搭配缩放、导出等操作完成展示。</span></div>',
+      intro: addCheckboxToIntro(
+        '<div style="line-height:1.6;"><strong style="font-size:16px;color:#1f2333;">标签云画布</strong><br/><span style="color:#64748b;">生成结果会显示在此处，可搭配缩放、导出等操作完成展示。</span></div>'
+      ),
     },
     {
       element: getTutorialButtonElement(),
-      intro:
-        '<div style="text-align:center;line-height:1.6;"><div style="font-size:20px;margin-bottom:12px;">🎉 引导完成</div><div style="color:#64748b;margin-bottom:12px;">随时点击右上角的<span style="color:#399ceb;">"引导教程"</span>图标重新查看操作提示。</div><div style="font-size:12px;color:#94a3b8;">祝您创作顺利！</div></div>',
+      intro: addCheckboxToIntro(
+        '<div style="text-align:center;line-height:1.6;"><div style="font-size:20px;margin-bottom:12px;">🎉 引导完成</div><div style="color:#64748b;margin-bottom:12px;">随时点击右上角的<span style="color:#399ceb;">"引导教程"</span>图标重新查看操作提示。</div><div style="font-size:12px;color:#94a3b8;">祝您创作顺利！</div></div>'
+      ),
     },
-  ]);
+  ];
+  
+  intro.addSteps(steps);
 
   intro.setOptions({
     nextLabel: '下一步 →',
@@ -194,31 +245,126 @@ const createIntro = () => {
     tooltipRenderAsHtml: true,
   });
 
+  // Set up checkbox listeners when step changes (if callback is available)
+  // Note: We also use inline onchange handler in HTML as fallback
+  if (typeof intro.onchange === 'function') {
+    intro.onchange(() => {
+      nextTick(() => {
+        // Update all checkboxes to reflect current state
+        const checkboxes = document.querySelectorAll('.tutorial-disable-checkbox-treemap2');
+        const isDisabled = getTutorialPreference();
+        checkboxes.forEach((checkbox) => {
+          checkbox.checked = isDisabled;
+          if (!checkbox.hasAttribute('data-listener-attached')) {
+            checkbox.setAttribute('data-listener-attached', 'true');
+            checkbox.addEventListener('change', (e) => {
+              saveTutorialPreference(e.target.checked);
+              // Sync all checkboxes
+              document.querySelectorAll('.tutorial-disable-checkbox-treemap2').forEach((cb) => {
+                cb.checked = e.target.checked;
+              });
+            });
+          }
+        });
+      });
+    });
+  }
+
   intro.onComplete(() => {
+    // Check checkbox state when completing (check any checkbox, they should all be in sync)
+    const checkbox = document.querySelector('.tutorial-disable-checkbox-treemap2');
+    if (checkbox) {
+      saveTutorialPreference(checkbox.checked);
+    }
     firstIntroStarted = false;
+    currentIntro = null;
   });
 
   intro.onExit(() => {
+    // Check checkbox state when exiting (check any checkbox, they should all be in sync)
+    const checkbox = document.querySelector('.tutorial-disable-checkbox-treemap2');
+    if (checkbox) {
+      saveTutorialPreference(checkbox.checked);
+    }
     firstIntroStarted = false;
+    currentIntro = null;
   });
 
   return intro;
 };
 
 const restartIntro = () => {
+  // Exit current intro if exists
+  if (currentIntro) {
+    try {
+      if (typeof currentIntro.exit === 'function') {
+        currentIntro.exit(true);
+      } else if (typeof currentIntro.exitIntro === 'function') {
+        currentIntro.exitIntro(true);
+      }
+    } catch (e) {
+      console.warn('Error exiting current intro:', e);
+    }
+  }
+  
+  // Also try to exit any existing intro.js instance
+  try {
+    if (introJs && typeof introJs.exit === 'function') {
+      introJs.exit(true);
+    }
+  } catch (e) {
+    // Ignore errors
+  }
+  
   firstIntroStarted = false;
-  nextTick(() => {
-    const intro = createIntro();
-    intro.start();
-  });
+  currentIntro = null;
+  
+  // Wait a bit for cleanup, then start new intro
+  setTimeout(() => {
+    nextTick(() => {
+      try {
+        const intro = createIntro();
+        currentIntro = intro;
+        // Ensure intro.js is available
+        if (!intro || typeof intro.start !== 'function') {
+          console.error('Intro.js not properly initialized');
+          return;
+        }
+        console.log('Starting intro.js tour...');
+        intro.start();
+      } catch (error) {
+        console.error('Error starting intro:', error);
+        firstIntroStarted = false;
+        currentIntro = null;
+      }
+    });
+  }, 200);
 };
 
 const initIntro = () => {
+  // Check if user has disabled tutorial
+  if (shouldDisableTutorial()) {
+    return;
+  }
   if (firstIntroStarted || showHelpPage.value || showFeedbackPage.value) return;
   firstIntroStarted = true;
   nextTick(() => {
-    const intro = createIntro();
-    intro.start();
+    try {
+      const intro = createIntro();
+      currentIntro = intro;
+      // Ensure intro.js is available
+      if (!intro || typeof intro.start !== 'function') {
+        console.error('Intro.js not properly initialized');
+        firstIntroStarted = false;
+        currentIntro = null;
+        return;
+      }
+      intro.start();
+    } catch (error) {
+      console.error('Error starting intro:', error);
+      firstIntroStarted = false;
+      currentIntro = null;
+    }
   });
 };
 
