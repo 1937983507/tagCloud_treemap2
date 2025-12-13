@@ -373,6 +373,124 @@ const graphColoring = (graph, m) => {
   return colorindexs;
 };
 
+// 自定义曲线生成器：将线段两端往里缩，然后用贝塞尔曲线连接
+const createRoundedPolylineCurve = (shrinkRatio = 0.15) => {
+  return function(context) {
+    const points = [];
+    
+    return {
+      lineStart() {
+        points.length = 0;
+      },
+      point(x, y) {
+        points.push([x, y]);
+      },
+      lineEnd() {
+        if (points.length < 2) {
+          if (points.length === 1) {
+            context.moveTo(points[0][0], points[0][1]);
+          }
+          return;
+        }
+        
+        // 计算每个顶点处的缩进点
+        const shrunkPoints = [];
+        
+        for (let i = 0; i < points.length; i++) {
+          if (i === 0) {
+            // 第一个点：直接使用原始点，不缩进
+            shrunkPoints.push({
+              point: points[0],
+              vertex: null
+            });
+          } else if (i === points.length - 1) {
+            // 最后一个点：直接使用原始点，不缩进
+            shrunkPoints.push({
+              point: points[i],
+              vertex: null
+            });
+          } else {
+            // 中间点：计算前后两段的缩进点
+            const prev = points[i - 1];
+            const curr = points[i];
+            const next = points[i + 1];
+            
+            // 前一段的方向和距离
+            const dx1 = curr[0] - prev[0];
+            const dy1 = curr[1] - prev[1];
+            const dist1 = Math.sqrt(dx1 * dx1 + dy1 * dy1);
+            
+            // 后一段的方向和距离
+            const dx2 = next[0] - curr[0];
+            const dy2 = next[1] - curr[1];
+            const dist2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+            
+            if (dist1 > 0 && dist2 > 0) {
+              const unitX1 = dx1 / dist1;
+              const unitY1 = dy1 / dist1;
+              const unitX2 = dx2 / dist2;
+              const unitY2 = dy2 / dist2;
+              
+              const shrinkDist1 = dist1 * shrinkRatio;
+              const shrinkDist2 = dist2 * shrinkRatio;
+              
+              // 前一段的缩进点（从顶点往回缩）
+              const shrinkPointBefore = [
+                curr[0] - unitX1 * shrinkDist1,
+                curr[1] - unitY1 * shrinkDist1
+              ];
+              
+              // 后一段的缩进点（从顶点往前缩）
+              const shrinkPointAfter = [
+                curr[0] + unitX2 * shrinkDist2,
+                curr[1] + unitY2 * shrinkDist2
+              ];
+              
+              // 存储前一个缩进点
+              shrunkPoints.push({
+                point: shrinkPointBefore,
+                vertex: null
+              });
+              
+              // 存储顶点信息（用于贝塞尔曲线）
+              shrunkPoints.push({
+                point: shrinkPointAfter,
+                vertex: curr // 原始顶点作为控制点
+              });
+            } else {
+              shrunkPoints.push({ point: curr, vertex: null });
+            }
+          }
+        }
+        
+        if (shrunkPoints.length === 0) return;
+        
+        // 绘制路径
+        context.moveTo(shrunkPoints[0].point[0], shrunkPoints[0].point[1]);
+        
+        for (let i = 1; i < shrunkPoints.length; i++) {
+          const current = shrunkPoints[i];
+          const prev = shrunkPoints[i - 1];
+          
+          if (current.vertex) {
+            // 使用二次贝塞尔曲线连接，控制点为原始顶点
+            context.quadraticCurveTo(
+              current.vertex[0], current.vertex[1],
+              current.point[0], current.point[1]
+            );
+          } else {
+            // 直线连接
+            context.lineTo(current.point[0], current.point[1]);
+          }
+        }
+      },
+      result() {
+        return context.result();
+      }
+    };
+  };
+};
+
 // 绘制折线或曲线路径，可配置样式
 const drawSVGLine = (svg, root, cityOrder, lineOpts = {}) => {
   const { lineType = 'curve', width = 2, color = '#aaa' } = lineOpts;
@@ -400,7 +518,8 @@ const drawSVGLine = (svg, root, cityOrder, lineOpts = {}) => {
   if(lineType === 'curve') {
     lineGen.curve(d3.curveCatmullRom.alpha(0.5));
   } else if(lineType === 'polyline') {
-    lineGen.curve(d3.curveLinear);
+    // 使用自定义的圆角折线曲线生成器
+    lineGen.curve(createRoundedPolylineCurve(0.15));
   }
   
   // 先删除已存在的路径（如果存在）
