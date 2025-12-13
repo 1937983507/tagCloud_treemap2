@@ -79,7 +79,7 @@ tagCloud_treemap2/
    npm run dev
    ```
 
-   - 默认启动在 `http://localhost:5175`
+   - 默认启动在 `http://localhost:5175/treemap/`
    - 支持 Vite HMR，适合快速迭代前端面板
 
 4. **生产构建 / 预览**
