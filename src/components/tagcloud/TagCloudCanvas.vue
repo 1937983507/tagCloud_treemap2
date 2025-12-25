@@ -89,6 +89,7 @@ import { StripLayout, SpiralLayout, PivotLayout } from '@/utils/treemapLayouts';
 import { cityNameToPinyin } from '@/utils/cityNameToPinyin';
 import { ElButton, ElSpace, ElDropdown, ElDropdownMenu, ElDropdownItem, ElIcon, ElInputNumber, ElDialog, ElColorPicker, ElCheckbox } from 'element-plus';
 import { ArrowDown } from '@element-plus/icons-vue';
+import { recordTagCloudGeneration } from '@/utils/statistics';
 
 const exportDialogVisible = ref(false)
 const exportWidth = ref(800)
@@ -886,6 +887,15 @@ const handleRenderCloud = async () => {
     await new Promise(resolve => setTimeout(resolve, 50));
     // 等待所有词云绘制完成后再关闭 loading
     await drawAllWordClouds(svg, data, cityOrder, width, height, lineType);
+    
+    // 记录词云生成（包括重绘）
+    try {
+      await recordTagCloudGeneration('treemap');
+      // 触发事件通知 FooterBar 更新统计数据
+      window.dispatchEvent(new CustomEvent('tagcloud-generated'));
+    } catch (error) {
+      console.warn('记录词云生成失败:', error);
+    }
   } finally {
     // 确保 loading 至少显示最小时间
     const elapsed = Date.now() - startTime;
