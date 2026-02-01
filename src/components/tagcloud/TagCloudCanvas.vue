@@ -89,6 +89,7 @@ import { StripLayout, SpiralLayout, PivotLayout } from '@/utils/treemapLayouts';
 import { cityNameToPinyin } from '@/utils/cityNameToPinyin';
 import { ElButton, ElSpace, ElDropdown, ElDropdownMenu, ElDropdownItem, ElIcon, ElInputNumber, ElDialog, ElColorPicker, ElCheckbox } from 'element-plus';
 import { ArrowDown } from '@element-plus/icons-vue';
+import { recordTagCloudGeneration } from '@/utils/statistics';
 
 const exportDialogVisible = ref(false)
 const exportWidth = ref(800)
@@ -714,8 +715,279 @@ const drawWordCloud = (i, svg, cities, city, x, y, colorIndex, color, width, hei
   layout.start();
 };
 
+// 计算指标的函数
+const calculateMetrics = (leaves, cityOrder, cityData, data, renderStartTime, canvasWidth, canvasHeight) => {
+  // 1. 线性序列：目前渲染的城市序列
+  const linearSequence = cityOrder.join('-');
+  
+  // 2. 城市节点数量
+  const cityNodeCount = cityOrder.length;
+  
+  // 创建城市到leaf节点的映射
+  const cityToLeaf = new Map();
+  leaves.forEach(leaf => {
+    cityToLeaf.set(leaf.data.city, leaf);
+  });
+  
+  // 3. 序列保持度（连续性）：原本相邻的城市节点在treemap剖分结果下保持相邻的比例
+  let adjacentPairs = 0; // 原本相邻的城市对
+  let stillAdjacentPairs = 0; // 在treemap剖分结果下仍然相邻的城市对
+  const stillAdjacentCityPairs = []; // 仍然保持连续的城市节点对
+  const brokenCityPairs = []; // 不再连续的城市节点对
+  
+  // 计算原本相邻的城市对
+  for (let i = 0; i < cityOrder.length - 1; i++) {
+    const city1 = cityOrder[i];
+    const city2 = cityOrder[i + 1];
+    adjacentPairs++;
+    
+    const leaf1 = cityToLeaf.get(city1);
+    const leaf2 = cityToLeaf.get(city2);
+    
+    if (leaf1 && leaf2 && areNodesAdjacent(leaf1, leaf2)) {
+      stillAdjacentPairs++;
+      stillAdjacentCityPairs.push(`${city1}-${city2}`);
+    } else {
+      brokenCityPairs.push(`${city1}-${city2}`);
+    }
+  }
+  
+  const sequenceContinuity = adjacentPairs > 0 ? stillAdjacentPairs / adjacentPairs : 0;
+  
+  // 4. 可读性：用户视线改变的多少
+  // 计算方式：对于城市序列，计算相邻方向向量之间的夹角
+  // 例如：重庆-恩施-张家界-常德
+  // 向量1：重庆→恩施，向量2：恩施→张家界，向量3：张家界→常德
+  // 计算向量1和向量2的夹角，向量2和向量3的夹角
+  let noOffsetCount = 0; // 视线没有偏移的次数（夹角<=6°）
+  let totalVectorPairs = 0; // 总的相邻方向向量对数量
+  const noOffsetPairs = []; // 没有视线偏移的向量对
+  const offsetPairs = []; // 需要转移视线的向量对
+  
+  // 首先计算所有方向向量
+  const directionVectors = [];
+  for (let i = 0; i < cityOrder.length - 1; i++) {
+    const city1 = cityOrder[i];
+    const city2 = cityOrder[i + 1];
+    
+    const leaf1 = cityToLeaf.get(city1);
+    const leaf2 = cityToLeaf.get(city2);
+    
+    if (leaf1 && leaf2) {
+      // 获取城市矩形节点的中心点
+      const centerX1 = (leaf1.x0 + leaf1.x1) / 2;
+      const centerY1 = (leaf1.y0 + leaf1.y1) / 2;
+      const centerX2 = (leaf2.x0 + leaf2.x1) / 2;
+      const centerY2 = (leaf2.y0 + leaf2.y1) / 2;
+      
+      // 计算方向向量（从city1到city2）
+      const dx = centerX2 - centerX1;
+      const dy = centerY2 - centerY1;
+      
+      directionVectors.push({
+        fromCity: city1,
+        toCity: city2,
+        dx: dx,
+        dy: dy,
+        angle: Math.atan2(dy, dx)
+      });
+    }
+  }
+  
+  // 计算相邻方向向量之间的夹角
+  const angleDiffs = []; // 存储所有角度差值，用于计算均值和方差
+  for (let i = 0; i < directionVectors.length - 1; i++) {
+    const vector1 = directionVectors[i];
+    const vector2 = directionVectors[i + 1];
+    totalVectorPairs++;
+    
+    // 计算两个向量的夹角
+    const angle1 = vector1.angle;
+    const angle2 = vector2.angle;
+    
+    // 计算角度差（转换为度数）
+    let angleDiff = Math.abs(angle2 - angle1) * 180 / Math.PI;
+    // 处理角度超过180度的情况，取较小的角度
+    if (angleDiff > 180) {
+      angleDiff = 360 - angleDiff;
+    }
+    
+    // 保存角度差值
+    angleDiffs.push(angleDiff);
+    
+    // 如果角度差小于等于6度，认为没有偏移
+    if (angleDiff <= 6) {
+      noOffsetCount++;
+      noOffsetPairs.push(`${vector1.toCity}处 (${vector1.fromCity}→${vector1.toCity} 与 ${vector2.fromCity}→${vector2.toCity} 夹角: ${angleDiff.toFixed(2)}°)`);
+    } else {
+      offsetPairs.push(`${vector1.toCity}处 (${vector1.fromCity}→${vector1.toCity} 与 ${vector2.fromCity}→${vector2.toCity} 夹角: ${angleDiff.toFixed(2)}°)`);
+    }
+  }
+  
+  const readability = totalVectorPairs > 0 ? noOffsetCount / totalVectorPairs : 0;
+  
+  // 计算角度均值和变异系数
+  let angleMean = 0;
+  let angleCoefficientOfVariation = 0;
+  if (angleDiffs.length > 0) {
+    // 计算均值
+    angleMean = angleDiffs.reduce((sum, angle) => sum + angle, 0) / angleDiffs.length;
+    
+    // 计算变异系数（标准差/均值 × 100%）
+    if (angleDiffs.length > 1 && angleMean > 0) {
+      const sumSquaredDiff = angleDiffs.reduce((sum, angle) => {
+        const diff = angle - angleMean;
+        return sum + diff * diff;
+      }, 0);
+      const variance = sumSquaredDiff / angleDiffs.length;
+      const standardDeviation = Math.sqrt(variance);
+      angleCoefficientOfVariation = (standardDeviation / angleMean) * 100;
+    }
+  }
+  
+  // 5. 面积-权重相关性：城市原本的权重与最后剖分得到的面积之间的皮尔逊相关系数
+  const weights = [];
+  const areas = [];
+  
+  cityOrder.forEach(city => {
+    const cityDataItem = cityData.find(d => d.city === city);
+    const leaf = cityToLeaf.get(city);
+    
+    if (cityDataItem && leaf) {
+      weights.push(cityDataItem.attractions || 0);
+      const area = (leaf.x1 - leaf.x0) * (leaf.y1 - leaf.y0);
+      areas.push(area);
+    }
+  });
+  
+  // 计算皮尔逊相关系数
+  let areaWeightCorrelation = 0;
+  if (weights.length > 1 && areas.length > 1) {
+    const meanWeight = weights.reduce((a, b) => a + b, 0) / weights.length;
+    const meanArea = areas.reduce((a, b) => a + b, 0) / areas.length;
+    
+    let numerator = 0;
+    let sumSqWeight = 0;
+    let sumSqArea = 0;
+    
+    for (let i = 0; i < weights.length; i++) {
+      const weightDiff = weights[i] - meanWeight;
+      const areaDiff = areas[i] - meanArea;
+      numerator += weightDiff * areaDiff;
+      sumSqWeight += weightDiff * weightDiff;
+      sumSqArea += areaDiff * areaDiff;
+    }
+    
+    const denominator = Math.sqrt(sumSqWeight * sumSqArea);
+    areaWeightCorrelation = denominator > 0 ? numerator / denominator : 0;
+  }
+  
+  // 6. 平均面积误差率：理论应分配的面积与实际分配的面积之间的误差率
+  const totalWeight = cityData.reduce((sum, d) => sum + (d.attractions || 0), 0);
+  const totalWidth = canvasWidth || 0;
+  const totalHeight = canvasHeight || 0;
+  const totalCanvasArea = totalWidth * totalHeight;
+  const areaErrorRates = [];
+  
+  cityOrder.forEach(city => {
+    const cityDataItem = cityData.find(d => d.city === city);
+    const leaf = cityToLeaf.get(city);
+    
+    if (cityDataItem && leaf) {
+      const weight = cityDataItem.attractions || 0;
+      const expectedArea = totalWeight > 0 ? (weight / totalWeight) * totalCanvasArea : 0;
+      const actualArea = (leaf.x1 - leaf.x0) * (leaf.y1 - leaf.y0);
+      const error = Math.abs(actualArea - expectedArea);
+      const errorRate = expectedArea > 0 ? (error / expectedArea) * 100 : 0;
+      
+      areaErrorRates.push({
+        city: city,
+        expectedArea: expectedArea.toFixed(2),
+        actualArea: actualArea.toFixed(2),
+        errorRate: errorRate.toFixed(2)
+      });
+    }
+  });
+  
+  const averageAreaErrorRate = areaErrorRates.length > 0 
+    ? areaErrorRates.reduce((sum, item) => sum + parseFloat(item.errorRate), 0) / areaErrorRates.length 
+    : 0;
+  
+  // 7. treemap剖分的平均长宽比AAR
+  let totalAAR = 0;
+  let validLeaves = 0;
+  const rectangleDimensions = []; // 各个矩形的长度与宽度
+  
+  leaves.forEach(leaf => {
+    const width = leaf.x1 - leaf.x0;
+    const height = leaf.y1 - leaf.y0;
+    
+    if (width > 0 && height > 0) {
+      const aar = width > height ? width / height : height / width;
+      totalAAR += aar;
+      validLeaves++;
+      
+      rectangleDimensions.push({
+        city: leaf.data.city,
+        width: width.toFixed(2),
+        height: height.toFixed(2),
+        aar: aar.toFixed(4)
+      });
+    }
+  });
+  
+  const averageAspectRatio = validLeaves > 0 ? totalAAR / validLeaves : 0;
+  
+  // 8. 语义信息密度：单位面积内语义信息量（整体标签总数/整体面积）
+  let totalTags = 0;
+  let totalArea = 0;
+  
+  cityOrder.forEach(city => {
+    const cityTags = data[city] ? data[city].length : 0;
+    totalTags += cityTags;
+    
+    const leaf = cityToLeaf.get(city);
+    if (leaf) {
+      const width = leaf.x1 - leaf.x0;
+      const height = leaf.y1 - leaf.y0;
+      const area = width * height;
+      totalArea += area;
+    }
+  });
+  
+  const semanticDensity = totalCanvasArea > 0 ? totalTags / totalCanvasArea : 0;
+  
+  // 9. 运行效率：treemap剖分+各个子节点词云渲染的耗时（ms）
+  const renderEndTime = Date.now();
+  const renderEfficiency = renderEndTime - renderStartTime;
+  
+  return {
+    linearSequence,
+    cityNodeCount,
+    sequenceContinuity,
+    stillAdjacentCityPairs,
+    brokenCityPairs,
+    readability,
+    noOffsetPairs,
+    offsetPairs,
+    angleMean,
+    angleCoefficientOfVariation,
+    areaWeightCorrelation,
+    averageAreaErrorRate,
+    areaErrorRates,
+    averageAspectRatio,
+    rectangleDimensions,
+    semanticDensity,
+    totalTags,
+    totalArea: totalCanvasArea.toFixed(2),
+    totalWidth: totalWidth.toFixed(2),
+    totalHeight: totalHeight.toFixed(2),
+    renderEfficiency
+  };
+};
+
 // 绘制所有的词云
-const drawAllWordClouds = async (svg, data, cityOrder, width, height, lineType) => {
+const drawAllWordClouds = async (svg, data, cityOrder, width, height, lineType, renderStartTime) => {
   const cityData = calculateAttractionWeights(data, cityOrder);
   
   // 构建层次结构 - 原项目使用values作为children
@@ -829,6 +1101,46 @@ const drawAllWordClouds = async (svg, data, cityOrder, width, height, lineType) 
 
   return Promise.all(cloudPromises).then(() => {
     console.log('所有词云绘制完成');
+    
+    // 计算并输出指标
+    const metrics = calculateMetrics(leaves, cityOrder, cityData, data, renderStartTime, width, height);
+    
+    console.log('========== Treemap 指标统计 ==========');
+    console.log('1. 线性序列:', metrics.linearSequence);
+    console.log('2. 城市节点数量:', metrics.cityNodeCount);
+    
+    console.log('3. 序列保持度（连续性）:', (metrics.sequenceContinuity * 100).toFixed(2) + '%');
+    console.log('   仍然保持连续的城市节点对:', metrics.stillAdjacentCityPairs.length > 0 ? metrics.stillAdjacentCityPairs.join(', ') : '无');
+    console.log('   不再连续的城市节点对:', metrics.brokenCityPairs.length > 0 ? metrics.brokenCityPairs.join(', ') : '无');
+    
+    console.log('4. 可读性:', (metrics.readability * 100).toFixed(2) + '%');
+    console.log('   没有视线偏移的相邻向量对 (夹角<=6°):', metrics.noOffsetPairs.length > 0 ? metrics.noOffsetPairs.join('; ') : '无');
+    console.log('   需要转移视线的相邻向量对 (夹角>6°):', metrics.offsetPairs.length > 0 ? metrics.offsetPairs.join('; ') : '无');
+    console.log('   角度均值:', metrics.angleMean.toFixed(2) + '°');
+    console.log('   角度变异系数:', metrics.angleCoefficientOfVariation.toFixed(2) + '%');
+    
+    console.log('5. 面积-权重相关性:', metrics.areaWeightCorrelation.toFixed(4));
+    
+    console.log('6. 平均面积误差率:', metrics.averageAreaErrorRate.toFixed(2) + '%');
+    console.log('   各个子空间的面积误差率:');
+    metrics.areaErrorRates.forEach(item => {
+      console.log(`      ${item.city}: 理论面积=${item.expectedArea}, 实际面积=${item.actualArea}, 误差率=${item.errorRate}%`);
+    });
+    
+    console.log('7. 平均长宽比AAR:', metrics.averageAspectRatio.toFixed(4));
+    console.log('   各个矩形的长度与宽度:');
+    metrics.rectangleDimensions.forEach(dim => {
+      console.log(`      ${dim.city}: 宽度=${dim.width}, 高度=${dim.height}, AAR=${dim.aar}`);
+    });
+    
+    console.log('8. 语义信息密度:', metrics.semanticDensity.toFixed(6));
+    console.log('   总标签数量:', metrics.totalTags);
+    console.log('   总面积:', metrics.totalArea);
+    console.log('   总宽度:', metrics.totalWidth);
+    console.log('   总高度:', metrics.totalHeight);
+    
+    console.log('9. 运行效率:', metrics.renderEfficiency + 'ms');
+    console.log('=====================================');
   });
 };
 
@@ -885,7 +1197,16 @@ const handleRenderCloud = async () => {
     // 再次让浏览器渲染一次，确保 loading overlay 可见
     await new Promise(resolve => setTimeout(resolve, 50));
     // 等待所有词云绘制完成后再关闭 loading
-    await drawAllWordClouds(svg, data, cityOrder, width, height, lineType);
+    await drawAllWordClouds(svg, data, cityOrder, width, height, lineType, startTime);
+    
+    // 记录词云生成（包括重绘）
+    try {
+      await recordTagCloudGeneration('treemap');
+      // 触发事件通知 FooterBar 更新统计数据
+      window.dispatchEvent(new CustomEvent('tagcloud-generated'));
+    } catch (error) {
+      console.warn('记录词云生成失败:', error);
+    }
   } finally {
     // 确保 loading 至少显示最小时间
     const elapsed = Date.now() - startTime;
