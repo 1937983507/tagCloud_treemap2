@@ -193,6 +193,7 @@ import {
   generateRandomCityPairs
 } from '@/utils/batchTestUtils';
 import AMapLoader from '@amap/amap-jsapi-loader';
+import { getAmapLoaderConfig } from '@/config/amapLoader';
 import * as d3 from 'd3';
 import cloud from 'd3-cloud';
 import { StripLayout, SpiralLayout, PivotLayout } from '@/utils/treemapLayouts';
@@ -236,14 +237,11 @@ const totalTestCases = computed(() => {
 // 初始化高德地图
 onMounted(async () => {
   try {
-    amapGlobal = await AMapLoader.load({
-      key: '80838eddfb922202b289fd1ad6fa4e58',
-      version: '2.0',
-      plugins: [
-        'AMap.Driving',
-        'AMap.GeometryUtil',
-      ],
-    });
+    amapGlobal = await AMapLoader.load(
+      getAmapLoaderConfig({
+        plugins: ['AMap.Driving', 'AMap.GeometryUtil'],
+      }),
+    );
   } catch (error) {
     console.error('高德地图加载失败:', error);
     ElMessage.error('高德地图加载失败，批量测试功能不可用');
